@@ -1,235 +1,138 @@
-import { PrismaClient } from '@prisma/client'
+import 'dotenv/config'
 import bcrypt from 'bcryptjs'
+import pg from 'pg'
 
-const prisma = new PrismaClient()
+const { Pool } = pg
 
 async function main() {
+    const pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false },
+    })
+
     console.log('🌱 Starting seed...')
 
     // Create demo tenant
-    const tenant = await prisma.tenant.upsert({
-        where: { slug: 'sharma-coaching' },
-        update: {},
-        create: {
-            name: 'Sharma Coaching Classes',
-            slug: 'sharma-coaching',
-            themeColor: '#6366f1',
-            address: '123, Coaching Lane, New Delhi - 110001',
-            phone: '9876500001',
-            email: 'admin@sharmacoaching.com',
-        },
-    })
+    const tenantResult = await pool.query(`
+        INSERT INTO "Tenant" (id, name, slug, "themeColor", address, phone, email, "isActive", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW())
+        ON CONFLICT (slug) DO UPDATE SET name = $2
+        RETURNING id
+    `, [
+        'tenant_demo',
+        'Sharma Coaching Classes',
+        'sharma-coaching',
+        '#6366f1',
+        'C-45, Lajpat Nagar, New Delhi - 110024',
+        '9876543210',
+        'info@sharmacoaching.in',
+    ])
+    const tenantId = tenantResult.rows[0].id
+    console.log('✅ Tenant created')
 
-    console.log('✅ Tenant created:', tenant.name)
+    // Create Admin user
+    const adminPass = await bcrypt.hash('admin123', 10)
+    await pool.query(`
+        INSERT INTO "User" (id, "tenantId", email, phone, password, name, role, "isActive", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW())
+        ON CONFLICT ("tenantId", email) DO NOTHING
+    `, ['user_admin', tenantId, 'admin@coaching.com', '9876543210', adminPass, 'Rajesh Sharma', 'COACHING_ADMIN'])
+    console.log('✅ Admin user created: admin@coaching.com / admin123')
 
-    // Create admin user
-    const hashedPassword = await bcrypt.hash('admin123', 10)
-    const admin = await prisma.user.upsert({
-        where: { tenantId_email: { tenantId: tenant.id, email: 'admin@coaching.com' } },
-        update: {},
-        create: {
-            tenantId: tenant.id,
-            email: 'admin@coaching.com',
-            password: hashedPassword,
-            name: 'Sharma Admin',
-            role: 'COACHING_ADMIN',
-            phone: '9876500001',
-        },
-    })
+    // Create Teacher user
+    const teacherPass = await bcrypt.hash('teacher123', 10)
+    await pool.query(`
+        INSERT INTO "User" (id, "tenantId", email, phone, password, name, role, "isActive", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW())
+        ON CONFLICT ("tenantId", email) DO NOTHING
+    `, ['user_teacher', tenantId, 'teacher@coaching.com', '9876543211', teacherPass, 'Priya Singh', 'TEACHER'])
+    console.log('✅ Teacher user created: teacher@coaching.com / teacher123')
 
-    console.log('✅ Admin user created:', admin.email)
+    // Create Super Admin user
+    const superPass = await bcrypt.hash('super123', 10)
+    await pool.query(`
+        INSERT INTO "User" (id, "tenantId", email, phone, password, name, role, "isActive", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW())
+        ON CONFLICT ("tenantId", email) DO NOTHING
+    `, ['user_superadmin', tenantId, 'superadmin@coachpro.in', '9999999999', superPass, 'Super Admin', 'SUPER_ADMIN'])
+    console.log('✅ Super Admin created: superadmin@coachpro.in / super123')
 
-    // Create teacher user
-    const teacherPassword = await bcrypt.hash('teacher123', 10)
-    await prisma.user.upsert({
-        where: { tenantId_email: { tenantId: tenant.id, email: 'teacher@coaching.com' } },
-        update: {},
-        create: {
-            tenantId: tenant.id,
-            email: 'teacher@coaching.com',
-            password: teacherPassword,
-            name: 'Rajesh Sir',
-            role: 'TEACHER',
-            phone: '9876500010',
-        },
-    })
-
-    console.log('✅ Teacher user created')
-
-    // Create courses
-    const jee = await prisma.course.create({
-        data: {
-            tenantId: tenant.id,
-            name: 'JEE Foundation',
-            description: 'IIT-JEE Foundation course for class 11-12',
-            duration: '2 Years',
-            fees: 45000,
-            subjects: ['Physics', 'Chemistry', 'Maths'],
-        },
-    })
-
-    const neet = await prisma.course.create({
-        data: {
-            tenantId: tenant.id,
-            name: 'NEET Preparation',
-            description: 'Complete NEET preparation course',
-            duration: '1 Year',
-            fees: 35000,
-            subjects: ['Physics', 'Chemistry', 'Biology'],
-        },
-    })
-
+    // Create Courses
+    await pool.query(`INSERT INTO "Course" (id, "tenantId", name, description, duration, fees, subjects, "isActive", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,true,NOW(),NOW()) ON CONFLICT DO NOTHING`, ['course_1', tenantId, 'JEE Foundation', 'IIT-JEE preparation', '2 Years', 45000, '{Physics,Chemistry,Maths}'])
+    await pool.query(`INSERT INTO "Course" (id, "tenantId", name, description, duration, fees, subjects, "isActive", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,true,NOW(),NOW()) ON CONFLICT DO NOTHING`, ['course_2', tenantId, 'NEET Preparation', 'NEET-UG preparation', '2 Years', 48000, '{Physics,Chemistry,Biology}'])
     console.log('✅ Courses created')
 
-    // Create batches
-    const jeeMorning = await prisma.batch.create({
-        data: {
-            tenantId: tenant.id,
-            courseId: jee.id,
-            name: 'JEE Morning Batch',
-            startTime: '08:00',
-            endTime: '11:00',
-            capacity: 30,
-        },
-    })
-
-    const neetMorning = await prisma.batch.create({
-        data: {
-            tenantId: tenant.id,
-            courseId: neet.id,
-            name: 'NEET Morning Batch',
-            startTime: '08:00',
-            endTime: '11:00',
-            capacity: 25,
-        },
-    })
-
+    // Create Batches
+    await pool.query(`INSERT INTO "Batch" (id, "tenantId", "courseId", name, "startTime", "endTime", capacity, "isActive", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,true,NOW(),NOW()) ON CONFLICT DO NOTHING`, ['batch_1', tenantId, 'course_1', 'JEE Morning Batch', '07:00', '10:00', 35])
+    await pool.query(`INSERT INTO "Batch" (id, "tenantId", "courseId", name, "startTime", "endTime", capacity, "isActive", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,true,NOW(),NOW()) ON CONFLICT DO NOTHING`, ['batch_2', tenantId, 'course_2', 'NEET Morning Batch', '07:00', '10:30', 40])
     console.log('✅ Batches created')
 
-    // Create students
+    // Create Students
     const students = [
-        { fullName: 'Arjun Sharma', phone: '9876501001', fatherName: 'Ramesh Sharma', parentPhone: '9876501002', courseId: jee.id, batchId: jeeMorning.id, totalFee: 45000, paidFee: 22500, studentId: 'STU001' },
-        { fullName: 'Priya Verma', phone: '9876502001', fatherName: 'Suresh Verma', parentPhone: '9876502002', courseId: neet.id, batchId: neetMorning.id, totalFee: 35000, paidFee: 35000, studentId: 'STU002' },
-        { fullName: 'Rahul Gupta', phone: '9876503001', fatherName: 'Vijay Gupta', parentPhone: '9876503002', courseId: jee.id, batchId: jeeMorning.id, totalFee: 45000, paidFee: 15000, studentId: 'STU003' },
-        { fullName: 'Sneha Patel', phone: '9876504001', fatherName: 'Anil Patel', parentPhone: '9876504002', courseId: neet.id, batchId: neetMorning.id, totalFee: 35000, paidFee: 35000, studentId: 'STU004' },
-        { fullName: 'Amit Kumar', phone: '9876505001', fatherName: 'Ravi Kumar', parentPhone: '9876505002', courseId: jee.id, batchId: jeeMorning.id, totalFee: 45000, paidFee: 20000, studentId: 'STU005' },
-        { fullName: 'Kavya Singh', phone: '9876506001', fatherName: 'Deepak Singh', parentPhone: '9876506002', courseId: neet.id, batchId: neetMorning.id, totalFee: 35000, paidFee: 31000, studentId: 'STU006' },
+        ['stu_1', 'Arjun Sharma', '9876501001', 'Ramesh Sharma', 'course_1', 'batch_1', 45000, 22500, 'STU001'],
+        ['stu_2', 'Priya Verma', '9876502001', 'Suresh Verma', 'course_2', 'batch_2', 48000, 48000, 'STU002'],
+        ['stu_3', 'Rahul Gupta', '9876503001', 'Mahesh Gupta', 'course_1', 'batch_1', 45000, 15000, 'STU003'],
+        ['stu_4', 'Sneha Patel', '9876504001', 'Kamlesh Patel', 'course_2', 'batch_2', 25000, 25000, 'STU004'],
+        ['stu_5', 'Vikram Singh', '9876505001', 'Brijesh Singh', 'course_1', 'batch_1', 48000, 24000, 'STU005'],
+        ['stu_6', 'Anjali Mishra', '9876506001', 'Dinesh Mishra', 'course_2', 'batch_2', 30000, 10000, 'STU006'],
     ]
-
     for (const s of students) {
-        await prisma.student.create({
-            data: { tenantId: tenant.id, ...s, gender: 'MALE' },
-        })
+        await pool.query(`INSERT INTO "Student" (id, "tenantId", "courseId", "batchId", "studentId", "fullName", "fatherName", phone, gender, "totalFee", "paidFee", status, "admissionDate", "createdAt", "updatedAt") VALUES ($1,$2,$5,$6,$9,$3,$4,$3,'MALE',$7,$8,'ACTIVE',NOW(),NOW(),NOW()) ON CONFLICT DO NOTHING`, [s[0], tenantId, s[1], s[3], s[4], s[5], s[6], s[7], s[8]])
     }
-
     console.log('✅ Students created:', students.length)
 
-    // Create teachers
-    await prisma.teacher.create({
-        data: { tenantId: tenant.id, name: 'Dr. Rajesh Kumar', email: 'rajesh@coaching.com', phone: '9876510001', subject: ['Physics', 'Maths'], salary: 35000 },
-    })
-    await prisma.teacher.create({
-        data: { tenantId: tenant.id, name: 'Priya Sharma', email: 'priya.s@coaching.com', phone: '9876510002', subject: ['Chemistry'], salary: 28000 },
-    })
-    await prisma.teacher.create({
-        data: { tenantId: tenant.id, name: 'Amit Verma', email: 'amit.v@coaching.com', phone: '9876510003', subject: ['Biology', 'Chemistry'], salary: 30000 },
-    })
-
+    // Create Teachers
+    await pool.query(`INSERT INTO "Teacher" (id, "tenantId", name, email, phone, subject, salary, "isActive", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,true,NOW(),NOW()) ON CONFLICT DO NOTHING`, ['teacher_1', tenantId, 'Dr. Rajesh Kumar', 'rajesh@coaching.com', '9876511001', '{Physics,Maths}', 45000])
+    await pool.query(`INSERT INTO "Teacher" (id, "tenantId", name, email, phone, subject, salary, "isActive", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,true,NOW(),NOW()) ON CONFLICT DO NOTHING`, ['teacher_2', tenantId, 'Priya Singh', 'priya.t@coaching.com', '9876511002', '{Chemistry,Biology}', 40000])
+    await pool.query(`INSERT INTO "Teacher" (id, "tenantId", name, email, phone, subject, salary, "isActive", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,true,NOW(),NOW()) ON CONFLICT DO NOTHING`, ['teacher_3', tenantId, 'Amit Jain', 'amit@coaching.com', '9876511003', '{Maths,Accounts}', 38000])
     console.log('✅ Teachers created')
 
-    // Create subscription
-    await prisma.subscription.create({
-        data: {
-            tenantId: tenant.id,
-            plan: 'PRO',
-            status: 'ACTIVE',
-            amount: 2999,
-            trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            currentPeriodStart: new Date(),
-            currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        },
-    })
-
+    // Create Subscription
+    await pool.query(`INSERT INTO "Subscription" (id, "tenantId", plan, status, amount, "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,$5,NOW(),NOW()) ON CONFLICT ("tenantId") DO NOTHING`, ['sub_1', tenantId, 'PRO', 'ACTIVE', 2999])
     console.log('✅ Subscription created')
 
-    // Create some leads
+    // Create Leads
     const leads = [
-        { name: 'Rohit Mehra', phone: '9876520001', course: 'JEE Foundation', source: 'WhatsApp', status: 'NEW' as const },
-        { name: 'Anita Desai', phone: '9876520002', course: 'NEET Preparation', source: 'Website', status: 'CONTACTED' as const },
-        { name: 'Vikash Rao', phone: '9876520003', course: 'JEE Foundation', source: 'Referral', status: 'INTERESTED' as const },
-        { name: 'Pooja Jain', phone: '9876520004', course: 'NEET Preparation', source: 'Instagram', status: 'CONVERTED' as const },
+        ['lead_1', 'Rohan Agarwal', '9876520001', 'JEE Foundation', 'Website', 'NEW'],
+        ['lead_2', 'Kavya Nair', '9876520002', 'NEET Preparation', 'WhatsApp', 'CONTACTED'],
+        ['lead_3', 'Aditya Mehta', '9876520003', 'Class 10 Board', 'Referral', 'INTERESTED'],
+        ['lead_4', 'Simran Kaur', '9876520004', 'JEE Foundation', 'Instagram', 'CONVERTED'],
     ]
-
     for (const l of leads) {
-        await prisma.lead.create({ data: { tenantId: tenant.id, ...l } })
+        await pool.query(`INSERT INTO "Lead" (id, "tenantId", name, phone, course, source, status, "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW()) ON CONFLICT DO NOTHING`, [l[0], tenantId, l[1], l[2], l[3], l[4], l[5]])
     }
-
     console.log('✅ Leads created:', leads.length)
 
-    // Create expenses
+    // Create Expenses
     const expenses = [
-        { category: 'Rent', amount: 25000, description: 'Monthly office rent' },
-        { category: 'Salary', amount: 93000, description: 'Teacher salaries' },
-        { category: 'Electricity', amount: 5000, description: 'Monthly electricity bill' },
-        { category: 'Marketing', amount: 15000, description: 'Social media ads' },
-        { category: 'Internet', amount: 2000, description: 'WiFi connection' },
-        { category: 'Office Supplies', amount: 5000, description: 'Stationery and supplies' },
-        { category: 'Maintenance', amount: 8000, description: 'AC servicing and cleaning' },
-        { category: 'Misc', amount: 7000, description: 'Miscellaneous expenses' },
+        ['exp_1', 'Rent', 25000, 'Monthly office rent'],
+        ['exp_2', 'Salary', 123000, 'Teacher salaries'],
+        ['exp_3', 'Electricity', 8500, 'Electricity bill'],
+        ['exp_4', 'Marketing', 15000, 'Digital marketing'],
+        ['exp_5', 'Misc', 3500, 'Stationery & supplies'],
     ]
-
     for (const e of expenses) {
-        await prisma.expense.create({
-            data: { tenantId: tenant.id, ...e, date: new Date() },
-        })
+        await pool.query(`INSERT INTO "Expense" (id, "tenantId", category, amount, date, description, "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,NOW(),$5,NOW(),NOW()) ON CONFLICT DO NOTHING`, [e[0], tenantId, e[1], e[2], e[3]])
     }
+    console.log('✅ Expenses created')
 
-    console.log('✅ Expenses created:', expenses.length)
+    // Create Mock Tests
+    await pool.query(`INSERT INTO "MockTest" (id, "tenantId", "batchId", title, subject, type, duration, "totalMarks", "passingMarks", "negativeMarks", "isPublished", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,NOW(),NOW()) ON CONFLICT DO NOTHING`, ['test_1', tenantId, 'batch_1', 'Physics Chapter 1 Test', 'Physics', 'MCQ', 60, 100, 40, 0.25])
+    await pool.query(`INSERT INTO "MockTest" (id, "tenantId", "batchId", title, subject, type, duration, "totalMarks", "passingMarks", "negativeMarks", "isPublished", "createdAt", "updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,NOW(),NOW()) ON CONFLICT DO NOTHING`, ['test_2', tenantId, 'batch_2', 'Biology Mock Test', 'Biology', 'MCQ', 90, 180, 72, 1])
+    console.log('✅ Mock Tests created')
 
-    // Create mock tests
-    await prisma.mockTest.create({
-        data: {
-            tenantId: tenant.id,
-            batchId: jeeMorning.id,
-            title: 'Physics Chapter 1 Test',
-            subject: 'Physics',
-            type: 'MCQ',
-            duration: 60,
-            totalMarks: 100,
-            passingMarks: 40,
-            negativeMarks: 0.25,
-            isPublished: true,
-        },
-    })
-    await prisma.mockTest.create({
-        data: {
-            tenantId: tenant.id,
-            batchId: neetMorning.id,
-            title: 'Biology Mock Test',
-            subject: 'Biology',
-            type: 'MCQ',
-            duration: 90,
-            totalMarks: 180,
-            passingMarks: 90,
-            negativeMarks: 1,
-            isPublished: true,
-        },
-    })
-
-    console.log('✅ Mock tests created')
     console.log('')
     console.log('🎉 Seed completed successfully!')
     console.log('')
     console.log('📋 Demo login credentials:')
-    console.log('   Admin:   admin@coaching.com / admin123')
-    console.log('   Teacher: teacher@coaching.com / teacher123')
+    console.log('   Admin:       admin@coaching.com / admin123')
+    console.log('   Teacher:     teacher@coaching.com / teacher123')
+    console.log('   Super Admin: superadmin@coachpro.in / super123')
+
+    await pool.end()
 }
 
-main()
-    .catch((e) => {
-        console.error('❌ Seed failed:', e)
-        process.exit(1)
-    })
-    .finally(async () => {
-        await prisma.$disconnect()
-    })
+main().catch((e) => {
+    console.error('❌ Seed failed:', e)
+    process.exit(1)
+})
