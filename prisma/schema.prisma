@@ -9,6 +9,7 @@ datasource db {
   provider = "postgresql"
 }
 
+
 model Tenant {
   id              String   @id @default(cuid())
   name            String
