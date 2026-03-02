@@ -168,19 +168,32 @@ export default function SubscriptionPage() {
                                     </li>
                                 ))}
                             </ul>
-                            <button
-                                className="btn"
-                                onClick={() => handleUpgrade(plan.name, plan.price)}
-                                disabled={isCurrentPlan || loadingPlan === plan.name}
-                                style={{
-                                    width: '100%', justifyContent: 'center',
-                                    background: isCurrentPlan ? 'var(--surface-3)' : `linear-gradient(135deg, ${plan.color}, ${plan.color}cc)`,
-                                    color: isCurrentPlan ? 'var(--text-muted)' : 'white',
-                                    cursor: isCurrentPlan ? 'not-allowed' : 'pointer',
-                                    boxShadow: isCurrentPlan ? 'none' : `0 4px 15px ${plan.color}40`,
-                                }}>
-                                {loadingPlan === plan.name ? 'Processing...' : isCurrentPlan ? '✓ Current Plan' : `Upgrade to ${plan.name}`}
-                            </button>
+                            {(() => {
+                                const isActiveCurrentPlan = isCurrentPlan && subscription?.status === 'ACTIVE'
+                                const isTrialCurrentPlan = isCurrentPlan && subscription?.status === 'TRIAL'
+                                const isDisabled = isActiveCurrentPlan || loadingPlan === plan.name
+
+                                let btnText = `Upgrade to ${plan.name}`
+                                if (loadingPlan === plan.name) btnText = 'Processing...'
+                                else if (isActiveCurrentPlan) btnText = '✓ Active Plan'
+                                else if (isTrialCurrentPlan) btnText = `Pay & Activate ${plan.name}`
+
+                                return (
+                                    <button
+                                        className="btn"
+                                        onClick={() => handleUpgrade(plan.name, plan.price)}
+                                        disabled={isDisabled}
+                                        style={{
+                                            width: '100%', justifyContent: 'center',
+                                            background: isActiveCurrentPlan ? 'var(--surface-3)' : `linear-gradient(135deg, ${plan.color}, ${plan.color}cc)`,
+                                            color: isActiveCurrentPlan ? 'var(--text-muted)' : 'white',
+                                            cursor: isActiveCurrentPlan ? 'not-allowed' : 'pointer',
+                                            boxShadow: isActiveCurrentPlan ? 'none' : `0 4px 15px ${plan.color}40`,
+                                        }}>
+                                        {btnText}
+                                    </button>
+                                )
+                            })()}
                         </div>
                     )
                 })}
