@@ -17,6 +17,7 @@ interface Tenant {
     logo?: string
     themeColor: string
     phone?: string
+    email?: string
     address?: string
 }
 
@@ -24,6 +25,7 @@ interface Subscription {
     plan: string
     status: string
     trialEndsAt?: string
+    amount?: number
 }
 
 interface AuthContextType {
