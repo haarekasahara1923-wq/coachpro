@@ -64,7 +64,7 @@ function DashboardSidebar({ open, onClose }: { open: boolean; onClose: () => voi
     const pathname = usePathname()
     const { user, tenant, subscription, logout } = useAuth()
     const isSuperAdmin = user?.role === 'SUPER_ADMIN'
-    const allNavItems = isSuperAdmin ? [...superAdminNav, ...navItems] : navItems
+    const allNavItems = isSuperAdmin ? superAdminNav : navItems
 
     const currentPlan = subscription?.plan || 'BASIC'
 
@@ -170,6 +170,8 @@ function DashboardHeader({ onMenuClick }: { onMenuClick: () => void }) {
             '/dashboard/subscription': 'Subscription',
             '/dashboard/affiliate': 'Affiliate Earnings',
             '/dashboard/super-admin': 'Platform Overview',
+            '/dashboard/super-admin/tenants': 'All Tenants',
+            '/dashboard/super-admin/subscriptions': 'Subscriptions',
             '/dashboard/super-admin/gyankosh': 'Gyankosh Admin',
         }
         return map[pathname] || 'Dashboard'
