@@ -117,7 +117,7 @@ export default function AnalyticsPage() {
                         <>
                             <ResponsiveContainer width="100%" height={200}>
                                 <PieChart>
-                                    <Pie data={data.courseDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ value, percent }: { name: string; value: number; percent?: number }) => `${value} (${((percent ?? 0) * 100).toFixed(0)}%)`}>
+                                    <Pie data={data.courseDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={(props: any) => `${props.value} (${((props.percent ?? 0) * 100).toFixed(0)}%)`}>
                                         {data.courseDistribution.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                                     </Pie>
                                     <Tooltip contentStyle={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'white' }} />
