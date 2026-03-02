@@ -1,83 +1,50 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 
-export default function CheckoutPage({ params }: { params: { id: string } }) {
+export default function CheckoutPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = use(params)
     const [product, setProduct] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [formData, setFormData] = useState({
-        studentName: '',
-        email: '',
-        phone: '',
-        affiliateTenantId: '',
+        studentName: '', email: '', phone: '', affiliateTenantId: '',
     })
     const [processing, setProcessing] = useState(false)
     const [success, setSuccess] = useState(false)
-    const [fileUrl, setFileUrl] = useState('')
-    const router = useRouter()
+    const [downloadLink, setDownloadLink] = useState('')
 
     useEffect(() => {
-        // Fill affiliate code if exists
         const storedAffiliate = localStorage.getItem('gyankosh_affiliate_id')
-        if (storedAffiliate) {
-            setFormData(prev => ({ ...prev, affiliateTenantId: storedAffiliate }))
-        }
+        if (storedAffiliate) setFormData(prev => ({ ...prev, affiliateTenantId: storedAffiliate }))
 
-        // Fetch product
-        fetch(`/api/marketplace/products/${params.id}`)
+        fetch(`/api/marketplace/products/${id}`)
             .then(res => res.json())
-            .then(data => {
-                if (!data.error) setProduct(data)
-                setLoading(false)
-            })
-            .catch(err => {
-                console.error(err)
-                setLoading(false)
-            })
-    }, [params.id])
+            .then(data => { if (!data.error) setProduct(data); setLoading(false) })
+            .catch(() => setLoading(false))
+    }, [id])
 
     const handlePayment = async () => {
         if (!formData.studentName || !formData.email || !formData.phone) {
-            alert('Please fill all mandatory fields.')
-            return
+            alert('Please fill all mandatory fields.'); return
         }
-
         setProcessing(true)
-
         try {
-            // Create order
             const orderRes = await fetch('/api/marketplace/create-order', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    productId: params.id,
-                    ...formData
-                })
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productId: id, ...formData })
             })
-
             const orderData = await orderRes.json()
+            if (orderData.error) { alert('Error: ' + orderData.error); setProcessing(false); return }
 
-            if (orderData.error) {
-                alert('Error: ' + orderData.error)
-                setProcessing(false)
-                return
-            }
-
-            // Initialize Razorpay
             const options = {
-                key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '', // Put your key here
-                amount: orderData.amount,
-                currency: orderData.currency,
-                name: 'Gyankosh Marketplace',
-                description: product.title,
+                key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
+                amount: orderData.amount, currency: orderData.currency,
+                name: 'Gyankosh Marketplace', description: product.title,
                 order_id: orderData.orderId,
                 handler: async function (response: any) {
-                    // Verify
                     const verifyRes = await fetch('/api/marketplace/verify-order', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_order_id: response.razorpay_order_id,
@@ -85,47 +52,26 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
                             dbOrderId: orderData.dbOrderId
                         })
                     })
-
                     const verifyData = await verifyRes.json()
-
                     if (verifyData.success) {
                         setSuccess(true)
-                        setFileUrl(product.fileUrl || '')
-                    } else {
-                        alert('Payment verification failed.')
-                    }
+                        setDownloadLink(verifyData.downloadLink || product.fileUrl || '')
+                    } else { alert('Payment verification failed.') }
                 },
-                prefill: {
-                    name: formData.studentName,
-                    email: formData.email,
-                    contact: formData.phone,
-                },
-                theme: {
-                    color: '#10b981'
-                }
+                prefill: { name: formData.studentName, email: formData.email, contact: formData.phone },
+                theme: { color: '#10b981' }
             }
 
             const rzp = new (window as any).Razorpay(options)
-            rzp.on('payment.failed', function () {
-                alert('Payment failed')
-            })
+            rzp.on('payment.failed', function () { alert('Payment failed') })
             rzp.open()
-
         } catch (error) {
-            console.error(error)
-            alert('Payment failed to initialize.')
-        } finally {
-            setProcessing(false)
-        }
+            console.error(error); alert('Payment failed to initialize.')
+        } finally { setProcessing(false) }
     }
 
-    if (loading) {
-        return <div style={{ color: 'white', textAlign: 'center', marginTop: '100px' }}>Loading...</div>
-    }
-
-    if (!product) {
-        return <div style={{ color: 'white', textAlign: 'center', marginTop: '100px' }}>Loading failed or Product not found.</div>
-    }
+    if (loading) return <div style={{ color: 'white', textAlign: 'center', marginTop: '100px' }}>Loading...</div>
+    if (!product) return <div style={{ color: 'white', textAlign: 'center', marginTop: '100px' }}>Product not found.</div>
 
     const finalPrice = product.price - (product.price * (product.discount / 100))
 
@@ -141,12 +87,13 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
                         <h2 style={{ color: 'white', marginBottom: '12px' }}>Payment Successful!</h2>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>Thank you for purchasing {product.title}.</p>
-                        {fileUrl ? (
-                            <a href={fileUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', background: '#10b981', color: 'white', padding: '12px 24px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold' }}>
-                                Access/Download Material
+                        <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '16px' }}>📧 The download link has also been sent to your email & WhatsApp.</p>
+                        {downloadLink ? (
+                            <a href={downloadLink} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', background: '#10b981', color: 'white', padding: '14px 28px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '16px' }}>
+                                📥 Download Your Product
                             </a>
                         ) : (
-                            <p style={{ color: 'var(--text-muted)' }}>Material will be sent to your email.</p>
+                            <p style={{ color: 'var(--text-muted)' }}>Material will be sent to your email shortly.</p>
                         )}
                     </div>
                 ) : (
@@ -177,20 +124,15 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
                                 <input type="text" className="input" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} style={{ width: '100%' }} />
                             </div>
                             <div>
-                                <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '6px' }}>Affiliate Code / Coaching ID (Optional)</label>
+                                <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '6px' }}>Affiliate Code (Optional)</label>
                                 <input type="text" className="input" value={formData.affiliateTenantId} onChange={e => setFormData({ ...formData, affiliateTenantId: e.target.value })} style={{ width: '100%' }} placeholder="Enter coaching ID if any" />
                                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Support your coaching center by entering their code.</p>
                             </div>
-
-                            <button
-                                onClick={handlePayment}
-                                disabled={processing}
-                                style={{
-                                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                                    color: 'white', border: 'none', padding: '14px', borderRadius: '8px',
-                                    fontSize: '16px', fontWeight: 'bold', cursor: processing ? 'not-allowed' : 'pointer',
-                                    marginTop: '16px'
-                                }}>
+                            <button onClick={handlePayment} disabled={processing} style={{
+                                background: 'linear-gradient(135deg, #10b981, #059669)',
+                                color: 'white', border: 'none', padding: '14px', borderRadius: '8px',
+                                fontSize: '16px', fontWeight: 'bold', cursor: processing ? 'not-allowed' : 'pointer', marginTop: '16px'
+                            }}>
                                 {processing ? 'Processing...' : `Pay ₹${finalPrice}`}
                             </button>
                         </div>

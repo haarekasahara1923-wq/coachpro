@@ -1,34 +1,26 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
 import { verifyAccessToken } from '@/lib/auth'
 
-
-
-async function getTenantId() {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('token')?.value
-    if (!token) return null
-    try {
-        const decoded = verifyAccessToken(token)
-        return decoded?.tenantId
-    } catch {
-        return null
-    }
+function getUser(req: NextRequest) {
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) return null
+    return verifyAccessToken(authHeader.split(' ')[1])
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const tenantId = await getTenantId()
-        if (!tenantId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = getUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const [details, withdrawals] = await Promise.all([
-            prisma.tenant.findUnique({ where: { id: tenantId } }),
-            prisma.affiliateWithdrawal.findMany({ where: { tenantId }, orderBy: { requestedAt: 'desc' } })
+            prisma.tenant.findUnique({ where: { id: user.tenantId } }),
+            prisma.affiliateWithdrawal.findMany({ where: { tenantId: user.tenantId }, orderBy: { requestedAt: 'desc' } })
         ])
 
         return NextResponse.json({ details, withdrawals })
     } catch (error) {
+        console.error('Affiliate GET error:', error)
         return NextResponse.json({ error: 'Failed' }, { status: 500 })
     }
 }

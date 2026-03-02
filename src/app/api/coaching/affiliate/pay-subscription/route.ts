@@ -1,24 +1,23 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
 import { verifyAccessToken } from '@/lib/auth'
 
+function getUser(req: NextRequest) {
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) return null
+    return verifyAccessToken(authHeader.split(' ')[1])
+}
 
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
     try {
-        const cookieStore = await cookies()
-        const token = cookieStore.get('token')?.value
-        if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        const decoded = verifyAccessToken(token)
-        if (!decoded?.tenantId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = getUser(req)
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
         const { plan, cost } = await req.json()
         if (!plan || !cost || cost <= 0) return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
 
         const tenant = await prisma.tenant.findUnique({
-            where: { id: decoded.tenantId },
+            where: { id: user.tenantId },
             include: { subscriptions: true }
         })
 
@@ -30,13 +29,11 @@ export async function POST(req: Request) {
 
         const currentSub = tenant.subscriptions[0]
 
-        // Deduct balance
         await prisma.tenant.update({
-            where: { id: decoded.tenantId },
+            where: { id: user.tenantId },
             data: { availableBalance: { decrement: cost } }
         })
 
-        // Update Subscription
         const start = new Date()
         const end = new Date()
         end.setMonth(end.getMonth() + 1)
@@ -44,39 +41,21 @@ export async function POST(req: Request) {
         if (currentSub) {
             await prisma.subscription.update({
                 where: { id: currentSub.id },
-                data: {
-                    plan,
-                    status: 'ACTIVE',
-                    amount: cost,
-                    currentPeriodStart: start,
-                    currentPeriodEnd: end,
-                }
+                data: { plan, status: 'ACTIVE', amount: cost, currentPeriodStart: start, currentPeriodEnd: end }
             })
         } else {
             await prisma.subscription.create({
-                data: {
-                    tenantId: decoded.tenantId,
-                    plan,
-                    status: 'ACTIVE',
-                    amount: cost,
-                    currentPeriodStart: start,
-                    currentPeriodEnd: end,
-                }
+                data: { tenantId: user.tenantId, plan, status: 'ACTIVE', amount: cost, currentPeriodStart: start, currentPeriodEnd: end }
             })
         }
 
-        // Log this action as a special withdrawal/payment
         await prisma.affiliateWithdrawal.create({
-            data: {
-                tenantId: decoded.tenantId,
-                amount: cost,
-                status: 'PAID',
-                notes: `Paid for ${plan} plan subscription`
-            }
+            data: { tenantId: user.tenantId, amount: cost, status: 'PAID', notes: `Paid for ${plan} plan subscription` }
         })
 
         return NextResponse.json({ success: true, message: 'Subscription updated successfully' })
     } catch (error) {
+        console.error('Pay subscription error:', error)
         return NextResponse.json({ error: 'Failed' }, { status: 500 })
     }
 }

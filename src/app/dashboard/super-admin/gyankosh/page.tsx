@@ -1,163 +1,219 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function AdminGyankosh() {
+    const { token } = useAuth()
     const [products, setProducts] = useState<any[]>([])
+    const [orders, setOrders] = useState<any[]>([])
     const [withdrawals, setWithdrawals] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
-
+    const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'withdrawals'>('products')
     const [showModal, setShowModal] = useState(false)
     const [formData, setFormData] = useState({
         title: '', description: '', category: 'COURSE_MATERIAL',
         price: 0, discount: 0, imageUrl: '', fileUrl: ''
     })
 
-    useEffect(() => {
-        fetchData()
-    }, [])
+    const authHeaders = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+
+    useEffect(() => { fetchData() }, [])
 
     const fetchData = async () => {
         setLoading(true)
         try {
             const [pRes, wRes] = await Promise.all([
-                fetch('/api/super-admin/gyankosh/products'),
-                fetch('/api/super-admin/gyankosh/withdrawals')
+                fetch('/api/super-admin/gyankosh/products', { headers: authHeaders }),
+                fetch('/api/super-admin/gyankosh/withdrawals', { headers: authHeaders })
             ])
             const pData = await pRes.json()
             const wData = await wRes.json()
-            if (!pData.error) setProducts(pData)
-            if (!wData.error) setWithdrawals(wData)
-        } catch (e) {
-            console.error(e)
-        }
+            if (pData.products) { setProducts(pData.products); setOrders(pData.orders || []) }
+            if (Array.isArray(wData)) setWithdrawals(wData)
+        } catch (e) { console.error(e) }
         setLoading(false)
     }
 
     const handleCreateProduct = async () => {
+        if (!formData.title || formData.price <= 0) { alert('Title and Price are required.'); return }
         try {
             const res = await fetch('/api/super-admin/gyankosh/products', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                method: 'POST', headers: authHeaders, body: JSON.stringify(formData)
             })
-            if (res.ok) {
-                alert('Product created successfully')
-                setShowModal(false)
-                fetchData()
-            } else {
-                alert('Failed to create product.')
-            }
-        } catch (e) {
-            console.error(e)
-        }
+            if (res.ok) { alert('Product created!'); setShowModal(false); setFormData({ title: '', description: '', category: 'COURSE_MATERIAL', price: 0, discount: 0, imageUrl: '', fileUrl: '' }); fetchData() }
+            else alert('Failed to create product.')
+        } catch (e) { console.error(e) }
+    }
+
+    const handleToggleProduct = async (id: string, isActive: boolean) => {
+        try {
+            await fetch('/api/super-admin/gyankosh/products', {
+                method: 'PUT', headers: authHeaders,
+                body: JSON.stringify({ id, isActive, action: 'toggle' })
+            })
+            fetchData()
+        } catch (e) { console.error(e) }
     }
 
     const handleWithdrawalStatus = async (id: string, status: string) => {
+        if (!window.confirm(`Mark this withdrawal as ${status}?`)) return
         try {
             const res = await fetch('/api/super-admin/gyankosh/withdrawals', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'PUT', headers: authHeaders,
                 body: JSON.stringify({ id, status })
             })
-            if (res.ok) {
-                alert('Status updated')
-                fetchData()
-            }
-        } catch (e) {
-            console.error(e)
-        }
+            if (res.ok) { alert('Updated!'); fetchData() }
+        } catch (e) { console.error(e) }
     }
 
-    if (loading) return <div>Loading...</div>
+    if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
+
+    const tabs = [
+        { key: 'products', label: '📦 Products', count: products.length },
+        { key: 'orders', label: '🧾 Orders', count: orders.length },
+        { key: 'withdrawals', label: '💸 Withdrawals', count: withdrawals.length },
+    ]
 
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '24px', fontWeight: 'bold' }}>Gyankosh Administration</h2>
+                <h2 style={{ fontSize: '24px', fontWeight: 'bold' }}>🛒 Gyankosh Administration</h2>
                 <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Add Product</button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                {/* Products Table */}
-                <div className="card">
-                    <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' }}>Products</h3>
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+                {tabs.map(tab => (
+                    <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+                        style={{
+                            padding: '10px 20px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', border: 'none',
+                            background: activeTab === tab.key ? 'var(--primary)' : 'var(--surface)',
+                            color: activeTab === tab.key ? 'white' : 'var(--text-secondary)'
+                        }}>
+                        {tab.label} ({tab.count})
+                    </button>
+                ))}
+            </div>
+
+            {/* Products Tab */}
+            {activeTab === 'products' && (
+                <div className="card" style={{ padding: 0 }}>
                     <div className="table-container">
-                        <table className="table">
+                        <table>
                             <thead>
-                                <tr>
-                                    <th>Title</th>
-                                    <th>Category</th>
-                                    <th>Price</th>
-                                    <th>Status</th>
-                                </tr>
+                                <tr><th>Title</th><th>Category</th><th>Price</th><th>Discount</th><th>Drive Link</th><th>Status</th><th>Action</th></tr>
                             </thead>
                             <tbody>
                                 {products.map(p => (
                                     <tr key={p.id}>
-                                        <td>{p.title}</td>
-                                        <td>{p.category}</td>
-                                        <td>₹{p.price} (-{p.discount}%)</td>
-                                        <td>{p.isActive ? 'Active' : 'Inactive'}</td>
+                                        <td style={{ fontWeight: '600' }}>{p.title}</td>
+                                        <td><span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>{p.category.replace('_', ' ')}</span></td>
+                                        <td>₹{p.price}</td>
+                                        <td>{p.discount}%</td>
+                                        <td style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {p.fileUrl ? <a href={p.fileUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: '12px' }}>🔗 View Link</a> : '—'}
+                                        </td>
+                                        <td>
+                                            <span className={`badge ${p.isActive ? 'badge-success' : 'badge-danger'}`}>{p.isActive ? 'Active' : 'Inactive'}</span>
+                                        </td>
+                                        <td>
+                                            <button className="btn btn-sm btn-secondary" style={{ fontSize: '12px', padding: '4px 8px' }} onClick={() => handleToggleProduct(p.id, p.isActive)}>
+                                                {p.isActive ? '⛔ Disable' : '✅ Enable'}
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
+                                {products.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>No products yet. Click "+ Add Product" to create one.</td></tr>}
                             </tbody>
                         </table>
                     </div>
                 </div>
+            )}
 
-                {/* Withdrawals Table */}
-                <div className="card">
-                    <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' }}>Withdrawal Requests</h3>
+            {/* Orders Tab */}
+            {activeTab === 'orders' && (
+                <div className="card" style={{ padding: 0 }}>
                     <div className="table-container">
-                        <table className="table">
+                        <table>
                             <thead>
-                                <tr>
-                                    <th>Tenant</th>
-                                    <th>Amount</th>
-                                    <th>Status</th>
-                                    <th>Action</th>
-                                </tr>
+                                <tr><th>Buyer</th><th>Product</th><th>Amount</th><th>Commission</th><th>Affiliate</th><th>Status</th><th>Date</th></tr>
+                            </thead>
+                            <tbody>
+                                {orders.map(o => (
+                                    <tr key={o.id}>
+                                        <td>
+                                            <div style={{ fontWeight: '600', fontSize: '14px' }}>{o.studentName}</div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{o.email} | {o.phone}</div>
+                                        </td>
+                                        <td style={{ fontSize: '14px' }}>{o.product?.title || '—'}</td>
+                                        <td style={{ fontWeight: '700', color: '#10b981' }}>₹{o.amount}</td>
+                                        <td style={{ fontWeight: '600', color: '#f59e0b' }}>₹{o.commissionAmount}</td>
+                                        <td style={{ fontSize: '12px' }}>{o.affiliateTenantId || '—'}</td>
+                                        <td><span className={`badge ${o.status === 'SUCCESS' ? 'badge-success' : o.status === 'PENDING' ? 'badge-warning' : 'badge-danger'}`}>{o.status}</span></td>
+                                        <td style={{ fontSize: '12px' }}>{new Date(o.createdAt).toLocaleDateString()}</td>
+                                    </tr>
+                                ))}
+                                {orders.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>No orders yet.</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Withdrawals Tab */}
+            {activeTab === 'withdrawals' && (
+                <div className="card" style={{ padding: 0 }}>
+                    <div className="table-container">
+                        <table>
+                            <thead>
+                                <tr><th>Coaching</th><th>Amount</th><th>Status</th><th>Requested</th><th>Actions</th></tr>
                             </thead>
                             <tbody>
                                 {withdrawals.map(w => (
                                     <tr key={w.id}>
-                                        <td>{w.tenant?.name}</td>
-                                        <td>₹{w.amount}</td>
                                         <td>
-                                            <span className={`badge ${w.status === 'PENDING' ? 'badge-warning' : w.status === 'PAID' ? 'badge-success' : 'badge-danger'}`}>
-                                                {w.status}
-                                            </span>
+                                            <div style={{ fontWeight: '600' }}>{w.tenant?.name}</div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>UPI: {w.tenant?.upiId || 'N/A'} | A/C: {w.tenant?.bankAccountNo || 'N/A'}</div>
                                         </td>
+                                        <td style={{ fontWeight: '700' }}>₹{w.amount}</td>
+                                        <td><span className={`badge ${w.status === 'PENDING' ? 'badge-warning' : w.status === 'PAID' ? 'badge-success' : 'badge-danger'}`}>{w.status}</span></td>
+                                        <td style={{ fontSize: '12px' }}>{new Date(w.requestedAt).toLocaleDateString()}</td>
                                         <td>
                                             {w.status === 'PENDING' && (
-                                                <div style={{ display: 'flex', gap: '8px' }}>
-                                                    <button style={{ padding: '4px 8px', background: 'var(--success)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                                                        onClick={() => handleWithdrawalStatus(w.id, 'PAID')}>Mark Paid</button>
-                                                    <button style={{ padding: '4px 8px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                                                        onClick={() => handleWithdrawalStatus(w.id, 'REJECTED')}>Reject</button>
+                                                <div style={{ display: 'flex', gap: '6px' }}>
+                                                    <button style={{ padding: '4px 10px', background: 'var(--success)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                                        onClick={() => handleWithdrawalStatus(w.id, 'PAID')}>✅ Paid</button>
+                                                    <button style={{ padding: '4px 10px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                                        onClick={() => handleWithdrawalStatus(w.id, 'REJECTED')}>❌ Reject</button>
                                                 </div>
                                             )}
                                         </td>
                                     </tr>
                                 ))}
+                                {withdrawals.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>No withdrawal requests.</td></tr>}
                             </tbody>
                         </table>
                     </div>
                 </div>
-            </div>
+            )}
 
+            {/* Add Product Modal */}
             {showModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content" style={{ width: '500px' }}>
-                        <h2 style={{ marginBottom: '16px' }}>Add New Product</h2>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
+                    <div className="modal-content" style={{ width: '550px' }}>
+                        <h2 style={{ marginBottom: '20px' }}>📦 Add New Digital Product</h2>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Title</label>
-                                <input type="text" className="input" style={{ width: '100%' }} value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Product Title *</label>
+                                <input type="text" className="input" style={{ width: '100%' }} value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g., NEET Physics Complete Notes" />
                             </div>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Category</label>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Description</label>
+                                <textarea className="input" style={{ width: '100%', minHeight: '60px' }} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Category</label>
                                 <select className="input" style={{ width: '100%' }} value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
                                     <option value="COURSE_MATERIAL">Course Material</option>
                                     <option value="MOCK_TEST">Mock Test</option>
@@ -170,21 +226,24 @@ export default function AdminGyankosh() {
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div>
-                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Price (₹)</label>
+                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Price (₹) *</label>
                                     <input type="number" className="input" style={{ width: '100%' }} value={formData.price} onChange={e => setFormData({ ...formData, price: Number(e.target.value) })} />
                                 </div>
                                 <div>
-                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Discount (%)</label>
+                                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Discount (%)</label>
                                     <input type="number" className="input" style={{ width: '100%' }} value={formData.discount} onChange={e => setFormData({ ...formData, discount: Number(e.target.value) })} />
                                 </div>
                             </div>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Cover Image URL</label>
-                                <input type="text" className="input" style={{ width: '100%' }} value={formData.imageUrl} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} />
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Cover Image URL</label>
+                                <input type="text" className="input" style={{ width: '100%' }} value={formData.imageUrl} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} placeholder="https://example.com/image.jpg" />
                             </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>File URL (Provided after purchase)</label>
-                                <input type="text" className="input" style={{ width: '100%' }} value={formData.fileUrl} onChange={e => setFormData({ ...formData, fileUrl: e.target.value })} />
+                            <div style={{ background: 'rgba(16,185,129,0.05)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600', color: '#10b981' }}>📁 Google Drive Download Link *</label>
+                                <input type="text" className="input" style={{ width: '100%' }} value={formData.fileUrl} onChange={e => setFormData({ ...formData, fileUrl: e.target.value })} placeholder="https://drive.google.com/file/d/.../view?usp=sharing" />
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                                    This Google Drive link will be auto-delivered to the buyer via email/WhatsApp after successful Razorpay payment.
+                                </p>
                             </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>

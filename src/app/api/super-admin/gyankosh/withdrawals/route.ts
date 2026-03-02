@@ -1,10 +1,18 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyAccessToken } from '@/lib/auth'
 
+function getUser(req: NextRequest) {
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) return null
+    return verifyAccessToken(authHeader.split(' ')[1])
+}
 
-
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        const user = getUser(req)
+        if (!user || user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
         const list = await prisma.affiliateWithdrawal.findMany({
             include: { tenant: true },
             orderBy: { requestedAt: 'desc' }
@@ -15,8 +23,11 @@ export async function GET() {
     }
 }
 
-export async function PUT(req: Request) {
+export async function PUT(req: NextRequest) {
     try {
+        const user = getUser(req)
+        if (!user || user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
         const { id, status } = await req.json()
         const record = await prisma.affiliateWithdrawal.update({
             where: { id },
@@ -26,7 +37,6 @@ export async function PUT(req: Request) {
             }
         })
 
-        // If rejected, refund available balance
         if (status === 'REJECTED') {
             await prisma.tenant.update({
                 where: { id: record.tenantId },
