@@ -99,8 +99,8 @@ export default function AnalyticsPage() {
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                         <XAxis dataKey="month" stroke="#64748b" tick={{ fontSize: 12 }} />
-                        <YAxis stroke="#64748b" tick={{ fontSize: 12 }} tickFormatter={v => `₹${(v / 1000).toFixed(0)}K`} />
-                        <Tooltip contentStyle={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'white' }} formatter={(v: number) => formatCurrency(v)} />
+                        <YAxis stroke="#64748b" tick={{ fontSize: 12 }} tickFormatter={(v: number) => `₹${(v / 1000).toFixed(0)}K`} />
+                        <Tooltip contentStyle={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'white' }} formatter={(v: unknown) => formatCurrency(Number(v ?? 0))} />
                         <Legend />
                         <Area type="monotone" dataKey="revenue" stroke="#6366f1" fill="url(#revenue)" strokeWidth={2} name="Revenue" />
                         <Area type="monotone" dataKey="expenses" stroke="#ef4444" fill="none" strokeWidth={2} strokeDasharray="5 5" name="Expenses" />
@@ -117,7 +117,7 @@ export default function AnalyticsPage() {
                         <>
                             <ResponsiveContainer width="100%" height={200}>
                                 <PieChart>
-                                    <Pie data={data.courseDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, value, percent }) => `${value} (${(percent * 100).toFixed(0)}%)`}>
+                                    <Pie data={data.courseDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ value, percent }: { name: string; value: number; percent?: number }) => `${value} (${((percent ?? 0) * 100).toFixed(0)}%)`}>
                                         {data.courseDistribution.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                                     </Pie>
                                     <Tooltip contentStyle={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'white' }} />
