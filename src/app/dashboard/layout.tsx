@@ -74,11 +74,11 @@ function DashboardSidebar({ open, onClose }: { open: boolean; onClose: () => voi
             <aside className={`sidebar ${open ? 'open' : ''}`}>
                 {/* Logo */}
                 <div className="sidebar-logo">
-                    <div className="sidebar-logo-icon">🎓</div>
+                    <div className="sidebar-logo-icon">{isSuperAdmin ? '👑' : '🎓'}</div>
                     <div>
                         <div style={{ fontSize: '14px', fontWeight: '800', color: 'white' }}>CoachPro</div>
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {tenant?.name || 'Loading...'}
+                            {isSuperAdmin ? 'Super Admin Portal' : (tenant?.name || 'Loading...')}
                         </div>
                     </div>
                 </div>
@@ -112,18 +112,20 @@ function DashboardSidebar({ open, onClose }: { open: boolean; onClose: () => voi
                         </div>
                     ))}
 
-                    {/* Subscription badge */}
-                    <Link href="/dashboard/subscription" style={{ textDecoration: 'none' }}>
-                        <div style={{ margin: '12px 8px', padding: '12px', background: 'rgba(99,102,241,0.1)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.2)', cursor: 'pointer', transition: 'background 0.2s' }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.15)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(99,102,241,0.1)'}
-                        >
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>Plan</div>
-                            <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--primary-light)' }}>
-                                {currentPlan} {subscription?.status === 'ACTIVE' ? 'Active ✓' : 'Trial ⏳'}
+                    {/* Subscription badge - hide for super admin */}
+                    {!isSuperAdmin && (
+                        <Link href="/dashboard/subscription" style={{ textDecoration: 'none' }}>
+                            <div style={{ margin: '12px 8px', padding: '12px', background: 'rgba(99,102,241,0.1)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.2)', cursor: 'pointer', transition: 'background 0.2s' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.15)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(99,102,241,0.1)'}
+                            >
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>Plan</div>
+                                <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--primary-light)' }}>
+                                    {currentPlan} {subscription?.status === 'ACTIVE' ? 'Active ✓' : 'Trial ⏳'}
+                                </div>
                             </div>
-                        </div>
-                    </Link>
+                        </Link>
+                    )}
 
                     {/* User */}
                     <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border)', marginTop: '8px' }}>

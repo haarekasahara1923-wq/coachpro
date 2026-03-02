@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function AdminGyankosh() {
@@ -11,6 +11,8 @@ export default function AdminGyankosh() {
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'withdrawals'>('products')
     const [showModal, setShowModal] = useState(false)
+    const [uploading, setUploading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const [formData, setFormData] = useState({
         title: '', description: '', category: 'COURSE_MATERIAL',
         price: 0, discount: 0, imageUrl: '', fileUrl: ''
@@ -235,8 +237,51 @@ export default function AdminGyankosh() {
                                 </div>
                             </div>
                             <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Cover Image URL</label>
-                                <input type="text" className="input" style={{ width: '100%' }} value={formData.imageUrl} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} placeholder="https://example.com/image.jpg" />
+                                <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>📷 Cover Image *</label>
+                                <input type="file" ref={fileInputRef} accept="image/*" style={{ display: 'none' }}
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0]
+                                        if (!file) return
+                                        setUploading(true)
+                                        try {
+                                            const uploadForm = new FormData()
+                                            uploadForm.append('file', file)
+                                            const res = await fetch('/api/upload', {
+                                                method: 'POST',
+                                                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                                body: uploadForm
+                                            })
+                                            const data = await res.json()
+                                            if (data.url) {
+                                                setFormData(prev => ({ ...prev, imageUrl: data.url }))
+                                                alert('Image uploaded!')
+                                            } else {
+                                                alert('Upload failed: ' + (data.error || 'Unknown error'))
+                                            }
+                                        } catch (err) { console.error(err); alert('Upload failed.') }
+                                        setUploading(false)
+                                    }}
+                                />
+                                {formData.imageUrl ? (
+                                    <div style={{ position: 'relative', marginBottom: '8px' }}>
+                                        <img src={formData.imageUrl} alt="Cover" style={{ width: '100%', maxHeight: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)' }} />
+                                        <button onClick={() => { setFormData({ ...formData, imageUrl: '' }); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                                            style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', color: 'white', border: 'none', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+                                    </div>
+                                ) : (
+                                    <div onClick={() => !uploading && fileInputRef.current?.click()}
+                                        style={{ border: '2px dashed var(--border)', borderRadius: '8px', padding: '24px', textAlign: 'center', cursor: uploading ? 'wait' : 'pointer', background: 'rgba(99,102,241,0.03)' }}>
+                                        {uploading ? (
+                                            <div style={{ color: 'var(--primary-light)', fontSize: '14px' }}>⏳ Uploading to Cloudinary...</div>
+                                        ) : (
+                                            <>
+                                                <div style={{ fontSize: '28px', marginBottom: '8px' }}>📷</div>
+                                                <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '600' }}>Click to choose image</div>
+                                                <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px' }}>JPG, PNG, WebP supported</div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             <div style={{ background: 'rgba(16,185,129,0.05)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.2)' }}>
                                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600', color: '#10b981' }}>📁 Google Drive Download Link *</label>
