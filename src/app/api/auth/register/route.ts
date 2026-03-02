@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { store, generateId } from '@/lib/store'
+import { prisma } from '@/lib/prisma'
 import { hashPassword, signAccessToken, signRefreshToken } from '@/lib/auth'
 import { slugify } from '@/lib/utils'
 
@@ -12,55 +12,62 @@ export async function POST(req: NextRequest) {
         }
 
         // Check if email already exists
-        const existingUser = store.users.find(u => u.email === email.toLowerCase())
+        const existingUser = await prisma.user.findFirst({ where: { email: email.toLowerCase() } })
         if (existingUser) {
             return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
         }
 
-        // Create tenant
-        const tenantId = generateId()
-        const tenant = {
-            id: tenantId,
-            name: coachingName,
-            slug: slugify(coachingName) + '-' + Date.now().toString(36),
-            themeColor: '#6366f1',
-            phone: phone || '',
-            email: email,
-            isActive: true,
-            createdAt: new Date(),
+        let tenantSlug = slugify(coachingName)
+        let slugExists = await prisma.tenant.findUnique({ where: { slug: tenantSlug } })
+        let count = 1
+        while (slugExists) {
+            tenantSlug = `${slugify(coachingName)}-${count}`
+            slugExists = await prisma.tenant.findUnique({ where: { slug: tenantSlug } })
+            count++
         }
-        store.tenants.push(tenant)
 
-        // Create admin user
         const hashedPassword = await hashPassword(password)
-        const userId = generateId()
-        const user = {
-            id: userId,
-            tenantId,
-            email: email.toLowerCase(),
-            phone: phone || '',
-            password: hashedPassword,
-            name,
-            role: 'COACHING_ADMIN',
-            isActive: true,
-            createdAt: new Date(),
-        }
-        store.users.push(user)
-
-        // Create trial subscription
         const trialEndsAt = new Date()
         trialEndsAt.setDate(trialEndsAt.getDate() + 7)
-        store.subscriptions.push({
-            id: generateId(),
-            tenantId,
-            plan: plan || 'BASIC',
-            status: 'TRIAL',
-            trialEndsAt,
-            amount: 0,
-            createdAt: new Date(),
+
+        const result = await prisma.$transaction(async (tx) => {
+            const tenant = await tx.tenant.create({
+                data: {
+                    name: coachingName,
+                    slug: tenantSlug,
+                    themeColor: '#6366f1',
+                    phone: phone || '',
+                    email: email,
+                    isActive: true,
+                }
+            })
+
+            const user = await tx.user.create({
+                data: {
+                    tenantId: tenant.id,
+                    email: email.toLowerCase(),
+                    phone: phone || '',
+                    password: hashedPassword,
+                    name,
+                    role: 'COACHING_ADMIN',
+                    isActive: true,
+                }
+            })
+
+            const subscription = await tx.subscription.create({
+                data: {
+                    tenantId: tenant.id,
+                    plan: plan || 'BASIC',
+                    status: 'TRIAL',
+                    trialEndsAt,
+                    amount: 0,
+                }
+            })
+
+            return { tenant, user, subscription }
         })
 
-        const payload = { userId, tenantId, role: 'COACHING_ADMIN', email: email.toLowerCase() }
+        const payload = { userId: result.user.id, tenantId: result.tenant.id, role: 'COACHING_ADMIN', email: email.toLowerCase() }
         const accessToken = signAccessToken(payload)
         const refreshToken = signRefreshToken(payload)
 
@@ -69,8 +76,8 @@ export async function POST(req: NextRequest) {
             message: 'Registration successful. 7-day free trial activated!',
             accessToken,
             refreshToken,
-            user: { id: userId, name, email, role: 'COACHING_ADMIN', tenantId },
-            tenant: { id: tenantId, name: coachingName, themeColor: '#6366f1' },
+            user: { id: result.user.id, name, email, role: 'COACHING_ADMIN', tenantId: result.tenant.id },
+            tenant: { id: result.tenant.id, name: coachingName, themeColor: '#6366f1' },
         }, { status: 201 })
     } catch (error) {
         console.error('Register error:', error)

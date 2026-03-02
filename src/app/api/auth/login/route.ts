@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { store, generateId } from '@/lib/store'
-import { signAccessToken, signRefreshToken, comparePassword, hashPassword } from '@/lib/auth'
-import { slugify } from '@/lib/utils'
+import { prisma } from '@/lib/prisma'
+import { signAccessToken, signRefreshToken, comparePassword } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
     try {
@@ -11,7 +10,9 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
         }
 
-        const user = store.users.find(u => u.email === email.toLowerCase() && u.isActive)
+        const user = await prisma.user.findFirst({
+            where: { email: email.toLowerCase(), isActive: true }
+        })
         if (!user) {
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
         }
@@ -21,8 +22,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
         }
 
-        const tenant = store.tenants.find(t => t.id === user.tenantId)
-        const subscription = store.subscriptions.find(s => s.tenantId === user.tenantId)
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: user.tenantId }
+        })
+
+        const subscription = await prisma.subscription.findUnique({
+            where: { tenantId: user.tenantId }
+        })
 
         const payload = {
             userId: user.id,
@@ -34,7 +40,10 @@ export async function POST(req: NextRequest) {
         const accessToken = signAccessToken(payload)
         const refreshToken = signRefreshToken(payload)
 
-        user.lastLogin = new Date()
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { lastLogin: new Date() }
+        })
 
         return NextResponse.json({
             success: true,
