@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import Razorpay from 'razorpay'
 
-const prisma = new PrismaClient()
+
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || '',
