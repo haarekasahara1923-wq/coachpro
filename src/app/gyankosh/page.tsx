@@ -14,7 +14,7 @@ interface Product {
     imageUrl: string
 }
 
-export default function GyankoshMarketplace() {
+function GyankoshMarketplaceContent() {
     const [products, setProducts] = useState<Product[]>([])
     const [loading, setLoading] = useState(true)
     const searchParams = useSearchParams()
@@ -146,5 +146,15 @@ export default function GyankoshMarketplace() {
                 </p>
             </footer>
         </div>
+    )
+}
+
+import { Suspense } from 'react'
+
+export default function GyankoshMarketplace() {
+    return (
+        <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f0f1a', color: 'white' }}>Loading Marketplace...</div>}>
+            <GyankoshMarketplaceContent />
+        </Suspense>
     )
 }
