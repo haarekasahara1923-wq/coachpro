@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
@@ -85,11 +86,17 @@ const statCards = (data: DashboardData['overview']) => [
 ]
 
 export default function DashboardPage() {
-    const { token, tenant } = useAuth()
+    const { token, tenant, user } = useAuth()
+    const router = useRouter()
     const [data, setData] = useState<DashboardData | null>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
+        // Redirect Super Admin to their panel immediately
+        if (user?.role === 'SUPER_ADMIN') {
+            router.replace('/dashboard/super-admin')
+            return
+        }
         if (!token) return
         fetch('/api/dashboard', {
             headers: { Authorization: `Bearer ${token}` }
@@ -97,7 +104,7 @@ export default function DashboardPage() {
             if (d.success) setData(d.data)
             setLoading(false)
         }).catch(() => setLoading(false))
-    }, [token])
+    }, [token, user, router])
 
     if (loading) {
         return (
