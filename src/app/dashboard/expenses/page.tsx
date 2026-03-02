@@ -77,8 +77,8 @@ export default function ExpensesPage() {
                     <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={byCat}>
                             <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 11 }} />
-                            <YAxis stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={v => `₹${(v / 1000).toFixed(0)}K`} />
-                            <Tooltip contentStyle={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'white' }} formatter={(v: number) => formatCurrency(v)} />
+                            <YAxis stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(v: any) => `₹${(Number(v) / 1000).toFixed(0)}K`} />
+                            <Tooltip contentStyle={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'white' }} formatter={(v: any) => formatCurrency(Number(v ?? 0))} />
                             <Bar dataKey="amount" fill="#6366f1" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
@@ -91,7 +91,7 @@ export default function ExpensesPage() {
                             <Pie data={byCat} dataKey="amount" nameKey="name" cx="50%" cy="50%" outerRadius={70}>
                                 {byCat.map((entry, i) => <Cell key={i} fill={COLORS[entry.name as keyof typeof COLORS] || '#6366f1'} />)}
                             </Pie>
-                            <Tooltip contentStyle={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'white' }} formatter={(v: number) => formatCurrency(v)} />
+                            <Tooltip contentStyle={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'white' }} formatter={(v: any) => formatCurrency(Number(v ?? 0))} />
                         </PieChart>
                     </ResponsiveContainer>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>

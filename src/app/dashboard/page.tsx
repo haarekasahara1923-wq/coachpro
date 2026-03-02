@@ -158,10 +158,10 @@ export default function DashboardPage() {
                         <BarChart data={data.monthlyRevenue}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                             <XAxis dataKey="month" stroke="#64748b" tick={{ fontSize: 12 }} />
-                            <YAxis stroke="#64748b" tick={{ fontSize: 12 }} tickFormatter={v => `₹${(v / 1000).toFixed(0)}K`} />
+                            <YAxis stroke="#64748b" tick={{ fontSize: 12 }} tickFormatter={(v: any) => `₹${(Number(v) / 1000).toFixed(0)}K`} />
                             <Tooltip
                                 contentStyle={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', color: 'white' }}
-                                formatter={(v: number) => [formatCurrency(v), 'Revenue']}
+                                formatter={(v: any) => [formatCurrency(Number(v ?? 0)), 'Revenue']}
                             />
                             <Bar dataKey="amount" fill="#6366f1" radius={[4, 4, 0, 0]} />
                         </BarChart>
@@ -175,7 +175,7 @@ export default function DashboardPage() {
                         <>
                             <ResponsiveContainer width="100%" height={160}>
                                 <PieChart>
-                                    <Pie data={data.courseDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, value }) => `${value}`}>
+                                    <Pie data={data.courseDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={(props: any) => `${props.value}`}>
                                         {data.courseDistribution.map((_, i) => (
                                             <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                                         ))}
