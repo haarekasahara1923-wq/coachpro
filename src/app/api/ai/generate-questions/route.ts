@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/app/api/middleware'
+import { requireAuth, requireFeature, checkPlanLimit } from '@/app/api/middleware'
 
 // Mock AI question generation - Replace with actual OpenAI/Gemini API calls
 function generateMockQuestions(subject: string, topic: string, count: number, difficulty: string, type: string) {
@@ -51,12 +51,19 @@ export async function POST(req: NextRequest) {
     const { error, user } = requireAuth(req)
     if (error) return error
 
+    // Feature gate check: User needs Pro/Elite plan for AI tools
+    const featureCheck = requireFeature(req, 'aiTools')
+    if (featureCheck.error) return featureCheck.error
+
     const body = await req.json()
     const { subject, topic, count = 5, difficulty = 'MEDIUM', type = 'MCQ' } = body
 
     if (!subject) {
         return NextResponse.json({ error: 'Subject is required' }, { status: 400 })
     }
+
+    // You could track generated questions here for billing/limits
+    // const limitCheck = checkPlanLimit(user!.tenantId, 'maxAIQuestions', currentCount + parseInt(count))
 
     // In production, call OpenAI or Gemini here
     const questions = generateMockQuestions(subject, topic, parseInt(count), difficulty, type)

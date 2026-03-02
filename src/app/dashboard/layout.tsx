@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { hasFeature, NAV_FEATURE_MAP, PlanFeatures } from '@/lib/planLimits'
 
 const navItems = [
     {
@@ -59,9 +60,11 @@ const superAdminNav = [
 
 function DashboardSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     const pathname = usePathname()
-    const { user, tenant, logout } = useAuth()
+    const { user, tenant, subscription, logout } = useAuth()
     const isSuperAdmin = user?.role === 'SUPER_ADMIN'
     const allNavItems = isSuperAdmin ? [...superAdminNav, ...navItems] : navItems
+
+    const currentPlan = subscription?.plan || 'BASIC'
 
     return (
         <>
@@ -83,25 +86,42 @@ function DashboardSidebar({ open, onClose }: { open: boolean; onClose: () => voi
                     {allNavItems.map(group => (
                         <div key={group.group}>
                             <div className="sidebar-section-title">{group.group}</div>
-                            {group.items.map(item => (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={`nav-item ${pathname === item.href ? 'active' : ''}`}
-                                    onClick={onClose}
-                                >
-                                    <span style={{ fontSize: '16px' }}>{item.icon}</span>
-                                    <span>{item.label}</span>
-                                </Link>
-                            ))}
+                            {group.items.map(item => {
+                                const requiredFeature = NAV_FEATURE_MAP[item.href]
+                                const isLocked = requiredFeature && !hasFeature(currentPlan, requiredFeature)
+
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        href={isLocked ? '/dashboard/subscription' : item.href}
+                                        className={`nav-item ${pathname === item.href ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
+                                        onClick={onClose}
+                                        style={isLocked ? { opacity: 0.6 } : {}}
+                                        title={isLocked ? 'Upgrade to unlock this feature' : ''}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                                            <span style={{ fontSize: '16px' }}>{item.icon}</span>
+                                            <span>{item.label}</span>
+                                        </div>
+                                        {isLocked && <span style={{ fontSize: '12px' }}>🔒</span>}
+                                    </Link>
+                                )
+                            })}
                         </div>
                     ))}
 
                     {/* Subscription badge */}
-                    <div style={{ margin: '12px 8px', padding: '12px', background: 'rgba(99,102,241,0.1)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.2)' }}>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>Plan</div>
-                        <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--primary-light)' }}>PRO Active ✓</div>
-                    </div>
+                    <Link href="/dashboard/subscription" style={{ textDecoration: 'none' }}>
+                        <div style={{ margin: '12px 8px', padding: '12px', background: 'rgba(99,102,241,0.1)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.2)', cursor: 'pointer', transition: 'background 0.2s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.15)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(99,102,241,0.1)'}
+                        >
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>Plan</div>
+                            <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--primary-light)' }}>
+                                {currentPlan} {subscription?.status === 'ACTIVE' ? 'Active ✓' : 'Trial ⏳'}
+                            </div>
+                        </div>
+                    </Link>
 
                     {/* User */}
                     <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border)', marginTop: '8px' }}>
@@ -215,6 +235,28 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             </main>
         </div>
     )
+}
+
+export function FeatureGate({ feature, children }: { feature: keyof PlanFeatures, children: React.ReactNode }) {
+    const { subscription } = useAuth()
+    const currentPlan = subscription?.plan || 'BASIC'
+
+    if (!hasFeature(currentPlan, feature)) {
+        return (
+            <div className="card" style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+                <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Feature Locked</h3>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', maxWidth: '400px', margin: '0 auto 24px' }}>
+                    This feature is not available on your current {currentPlan} plan. Upgrade your subscription to unlock this powerful capability for your coaching center.
+                </p>
+                <Link href="/dashboard/subscription" className="btn btn-primary">
+                    View Upgrade Options
+                </Link>
+            </div>
+        )
+    }
+
+    return <>{children}</>
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

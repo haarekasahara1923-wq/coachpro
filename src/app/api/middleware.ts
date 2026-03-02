@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAccessToken } from '@/lib/auth'
 import { store } from '@/lib/store'
+import { getPlanConfig, hasFeature, isWithinLimit, getUpgradePlanForFeature, type PlanFeatures, type PlanLimits } from '@/lib/planLimits'
 
 export function getAuthUser(req: NextRequest) {
     const authHeader = req.headers.get('authorization')
@@ -26,4 +27,58 @@ export function requireRole(req: NextRequest, roles: string[]) {
         return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }), user: null }
     }
     return { error: null, user }
+}
+
+// Get the current tenant's subscription plan
+export function getTenantPlan(tenantId: string): string {
+    const sub = store.subscriptions.find(s => s.tenantId === tenantId)
+    return sub?.plan || 'BASIC'
+}
+
+// Check if a feature is available for the tenant's plan
+export function requireFeature(req: NextRequest, feature: keyof PlanFeatures) {
+    const { error, user } = requireAuth(req)
+    if (error) return { error, user: null }
+
+    const plan = getTenantPlan(user!.tenantId)
+    if (!hasFeature(plan, feature)) {
+        const upgradeTo = getUpgradePlanForFeature(feature)
+        return {
+            error: NextResponse.json({
+                error: `This feature requires ${upgradeTo} plan or higher. Please upgrade your subscription.`,
+                code: 'PLAN_UPGRADE_REQUIRED',
+                requiredPlan: upgradeTo,
+                currentPlan: plan,
+            }, { status: 403 }),
+            user: null,
+        }
+    }
+    return { error: null, user }
+}
+
+// Check if adding a new entity is within the plan limit
+export function checkPlanLimit(tenantId: string, limitKey: keyof PlanLimits, currentCount: number) {
+    const plan = getTenantPlan(tenantId)
+    const config = getPlanConfig(plan)
+    const max = config.limits[limitKey]
+
+    if (max === 0) {
+        return {
+            allowed: false,
+            message: `This feature is not available on the ${config.displayName} plan. Please upgrade to access it.`,
+            currentPlan: plan,
+            limit: max,
+        }
+    }
+
+    if (max !== -1 && currentCount >= max) {
+        return {
+            allowed: false,
+            message: `You've reached the maximum limit of ${max} for your ${config.displayName} plan. Please upgrade to add more.`,
+            currentPlan: plan,
+            limit: max,
+        }
+    }
+
+    return { allowed: true, currentPlan: plan, limit: max }
 }
