@@ -45,6 +45,16 @@ model Tenant {
   auditLogs       AuditLog[]
   branches        Branch[]
   notifications   Notification[]
+
+  // Affiliate & Earnings
+  upiId             String?
+  bankAccountNo     String?
+  ifscCode          String?
+  totalEarnings     Float    @default(0)
+  availableBalance  Float    @default(0)
+  
+  affiliateOrders   GyankoshOrder[] @relation("TenantAffiliateOrders")
+  withdrawals       AffiliateWithdrawal[]
 }
 
 model User {
@@ -514,4 +524,78 @@ model Notification {
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+}
+
+// ----------------------------------------------------
+// GYANKOSH E-COMMERCE MODELS
+// ----------------------------------------------------
+
+model GyankoshProduct {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  category    CategoryType @default(COURSE_MATERIAL)
+  price       Float    @default(0)
+  discount    Float    @default(0) // Percentage or flat? Let's assume percentage.
+  imageUrl    String?
+  fileUrl     String?  // The actual material url provided after purchase
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders      GyankoshOrder[]
+}
+
+enum CategoryType {
+  COURSE_MATERIAL
+  MOCK_TEST
+  QUESTION_BANK
+  OLD_PAPER
+  INFOGRAPHIC
+  EBOOK
+  OTHER
+}
+
+model GyankoshOrder {
+  id                String   @id @default(cuid())
+  productId         String
+  studentName       String
+  email             String
+  phone             String
+  amount            Float
+  status            OrderStatus @default(PENDING)
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  affiliateTenantId String? 
+  commissionAmount  Float    @default(0) // Track how much commission was given
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  product         GyankoshProduct @relation(fields: [productId], references: [id])
+  tenant          Tenant?         @relation("TenantAffiliateOrders", fields: [affiliateTenantId], references: [id])
+}
+
+enum OrderStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model AffiliateWithdrawal {
+  id              String   @id @default(cuid())
+  tenantId        String
+  amount          Float
+  status          WithdrawalStatus @default(PENDING)
+  requestedAt     DateTime @default(now())
+  processedAt     DateTime?
+  notes           String?
+  
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
 }

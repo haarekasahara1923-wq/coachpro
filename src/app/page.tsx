@@ -84,6 +84,7 @@ export default function LandingPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <Link href="/gyankosh" className="btn" style={{ padding: '8px 18px', fontSize: '13px', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>📚 GYANKOSH</Link>
           <Link href="/login" className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Login</Link>
           <Link href="/register" className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '13px' }}>Free Trial 🚀</Link>
         </div>

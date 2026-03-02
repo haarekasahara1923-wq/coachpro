@@ -31,6 +31,7 @@ const navItems = [
             { href: '/dashboard/fees', icon: '💰', label: 'Fee Management' },
             { href: '/dashboard/payments', icon: '💳', label: 'Payments' },
             { href: '/dashboard/expenses', icon: '📉', label: 'Expenses' },
+            { href: '/dashboard/affiliate', icon: '🤝', label: 'Affiliate Earnings' },
         ]
     },
     {
@@ -54,6 +55,7 @@ const superAdminNav = [
             { href: '/dashboard/super-admin', icon: '👑', label: 'Platform Overview' },
             { href: '/dashboard/super-admin/tenants', icon: '🏗️', label: 'All Tenants' },
             { href: '/dashboard/super-admin/subscriptions', icon: '💎', label: 'Subscriptions' },
+            { href: '/dashboard/super-admin/gyankosh', icon: '🛒', label: 'Gyankosh Admin' },
         ]
     },
 ]
@@ -166,7 +168,9 @@ function DashboardHeader({ onMenuClick }: { onMenuClick: () => void }) {
             '/dashboard/whatsapp': 'WhatsApp Automation',
             '/dashboard/profile': 'Coaching Profile',
             '/dashboard/subscription': 'Subscription',
+            '/dashboard/affiliate': 'Affiliate Earnings',
             '/dashboard/super-admin': 'Platform Overview',
+            '/dashboard/super-admin/gyankosh': 'Gyankosh Admin',
         }
         return map[pathname] || 'Dashboard'
     }
