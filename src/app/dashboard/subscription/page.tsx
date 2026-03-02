@@ -1,5 +1,7 @@
 'use client'
 import { useAuth } from '@/contexts/AuthContext'
+import { useState } from 'react'
+import Script from 'next/script'
 import Link from 'next/link'
 
 const plans = [
@@ -28,11 +30,82 @@ const plans = [
 ]
 
 export default function SubscriptionPage() {
-    const { subscription, tenant } = useAuth()
+    const { subscription, tenant, token } = useAuth()
     const currentPlan = subscription?.plan || 'BASIC'
+    const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+
+    const handleUpgrade = async (planName: string, price: number) => {
+        setLoadingPlan(planName)
+        try {
+            const res = await fetch('/api/razorpay/create-order', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ amount: price, plan: planName })
+            })
+            const data = await res.json()
+
+            if (data.success) {
+                const options = {
+                    key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+                    amount: data.amount,
+                    currency: data.currency,
+                    name: 'CoachPro',
+                    description: `Upgrade to ${planName} Plan`,
+                    order_id: data.orderId,
+                    handler: async function (response: any) {
+                        const verifyRes = await fetch('/api/razorpay/verify', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                plan: planName
+                            })
+                        })
+                        const verifyData = await verifyRes.json()
+                        if (verifyData.success) {
+                            alert('Payment Successful & Plan Upgraded!')
+                            window.location.reload()
+                        } else {
+                            alert('Payment verification failed!')
+                        }
+                    },
+                    prefill: {
+                        name: tenant?.name || '',
+                        email: tenant?.email || '',
+                        contact: tenant?.phone || '',
+                    },
+                    theme: {
+                        color: '#6366f1'
+                    }
+                }
+
+                const rzp = new (window as any).Razorpay(options)
+                rzp.on('payment.failed', function (response: any) {
+                    alert('Payment Failed: ' + response.error.description)
+                })
+                rzp.open()
+            } else {
+                alert('Failed to initiate upgrade: ' + data.error)
+            }
+        } catch (error) {
+            console.error('Checkout error:', error)
+            alert('Something went wrong. Please try again later.')
+        } finally {
+            setLoadingPlan(null)
+        }
+    }
 
     return (
         <div>
+            <Script id="razorpay-checkout-js" src="https://checkout.razorpay.com/v1/checkout.js" />
             <div className="page-header">
                 <div>
                     <h1 className="page-title">⭐ Subscription Plans</h1>
@@ -97,7 +170,8 @@ export default function SubscriptionPage() {
                             </ul>
                             <button
                                 className="btn"
-                                disabled={isCurrentPlan}
+                                onClick={() => handleUpgrade(plan.name, plan.price)}
+                                disabled={isCurrentPlan || loadingPlan === plan.name}
                                 style={{
                                     width: '100%', justifyContent: 'center',
                                     background: isCurrentPlan ? 'var(--surface-3)' : `linear-gradient(135deg, ${plan.color}, ${plan.color}cc)`,
@@ -105,7 +179,7 @@ export default function SubscriptionPage() {
                                     cursor: isCurrentPlan ? 'not-allowed' : 'pointer',
                                     boxShadow: isCurrentPlan ? 'none' : `0 4px 15px ${plan.color}40`,
                                 }}>
-                                {isCurrentPlan ? '✓ Current Plan' : `Upgrade to ${plan.name}`}
+                                {loadingPlan === plan.name ? 'Processing...' : isCurrentPlan ? '✓ Current Plan' : `Upgrade to ${plan.name}`}
                             </button>
                         </div>
                     )

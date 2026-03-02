@@ -1,50 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, requireFeature, checkPlanLimit } from '@/app/api/middleware'
 
-// Mock AI question generation - Replace with actual OpenAI/Gemini API calls
-function generateMockQuestions(subject: string, topic: string, count: number, difficulty: string, type: string) {
-    const templates = {
-        Physics: [
-            { q: `What is the SI unit of ${topic || 'force'}?`, options: ['Newton', 'Joule', 'Watt', 'Pascal'], answer: 'A' },
-            { q: `Which law states that every action has an equal and opposite reaction?`, options: ["Newton's First Law", "Newton's Second Law", "Newton's Third Law", "Law of Gravitation"], answer: 'C' },
-            { q: `The velocity of light in vacuum is approximately:`, options: ['3 × 10⁸ m/s', '3 × 10⁶ m/s', '3 × 10¹⁰ m/s', '3 × 10⁴ m/s'], answer: 'A' },
-        ],
-        Chemistry: [
-            { q: `The atomic number of Carbon is:`, options: ['6', '12', '8', '14'], answer: 'A' },
-            { q: `What is the chemical formula of water?`, options: ['H₂O', 'CO₂', 'NaCl', 'H₂SO₄'], answer: 'A' },
-            { q: `Which gas is responsible for the greenhouse effect?`, options: ['Oxygen', 'Nitrogen', 'Carbon dioxide', 'Argon'], answer: 'C' },
-        ],
-        Maths: [
-            { q: `What is the value of π (pi) approximately?`, options: ['3.14', '2.71', '1.41', '1.73'], answer: 'A' },
-            { q: `The sum of angles of a triangle is:`, options: ['90°', '180°', '270°', '360°'], answer: 'B' },
-            { q: `What is the derivative of sin(x)?`, options: ['cos(x)', '-cos(x)', 'tan(x)', '-sin(x)'], answer: 'A' },
-        ],
-        Biology: [
-            { q: `The powerhouse of the cell is:`, options: ['Nucleus', 'Mitochondria', 'Ribosome', 'Chloroplast'], answer: 'B' },
-            { q: `DNA stands for:`, options: ['Deoxyribonucleic Acid', 'Dinitrogen Acid', 'Deoxyribose Nucleic Acid', 'None of these'], answer: 'A' },
-            { q: `Photosynthesis occurs in:`, options: ['Mitochondria', 'Nucleus', 'Chloroplast', 'Cytoplasm'], answer: 'C' },
-        ],
-    }
-
-    const subjectTemplates = templates[subject as keyof typeof templates] || templates.Physics
-    const questions = []
-
-    for (let i = 0; i < count; i++) {
-        const template = subjectTemplates[i % subjectTemplates.length]
-        questions.push({
-            subject,
-            topic: topic || subject,
-            questionText: template.q,
-            type: type || 'MCQ',
-            options: type === 'DESCRIPTIVE' ? [] : template.options,
-            correctAnswer: type === 'DESCRIPTIVE' ? '' : template.answer,
-            marks: difficulty === 'HARD' ? 4 : difficulty === 'EASY' ? 1 : 2,
-            difficulty: difficulty || 'MEDIUM',
-            explanation: `This is a ${difficulty || 'medium'} level question on ${topic || subject}.`,
+async function fetchFromGroq(systemContent: string, userContent: string) {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [{ role: "system", content: systemContent }, { role: "user", content: userContent }],
+            response_format: { type: "json_object" }
         })
-    }
+    })
+    if (!res.ok) throw new Error("Groq API error")
+    return await res.json()
+}
 
-    return questions
+async function fetchFromOpenAI(systemContent: string, userContent: string) {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [{ role: "system", content: systemContent }, { role: "user", content: userContent }],
+            response_format: { type: "json_object" }
+        })
+    })
+    if (!res.ok) throw new Error("OpenAI API error")
+    return await res.json()
 }
 
 export async function POST(req: NextRequest) {
@@ -55,22 +43,43 @@ export async function POST(req: NextRequest) {
     const featureCheck = requireFeature(req, 'aiTools')
     if (featureCheck.error) return featureCheck.error
 
-    const body = await req.json()
-    const { subject, topic, count = 5, difficulty = 'MEDIUM', type = 'MCQ' } = body
+    try {
+        const body = await req.json()
+        const { subject, topic, count = 5, difficulty = 'MEDIUM', type = 'MCQ' } = body
 
-    if (!subject) {
-        return NextResponse.json({ error: 'Subject is required' }, { status: 400 })
+        if (!subject) {
+            return NextResponse.json({ error: 'Subject is required' }, { status: 400 })
+        }
+
+        const systemContent = `You are an expert ${subject} teacher creating exams. You must output a JSON object containing a property 'questions' which is an array of ${count} objects. Each object must precisely match this format: { "subject": "${subject}", "topic": "${topic || subject}", "questionText": "Question here", "type": "${type}", "options": ["Option A", "Option B", "Option C", "Option D"], "correctAnswer": "Exact matching string from options array", "marks": ${difficulty === 'HARD' ? 4 : difficulty === 'EASY' ? 1 : 2}, "difficulty": "${difficulty}", "explanation": "Explanation for the answer" }. For DESCRIPTIVE type, you can leave options array empty and correctAnswer empty.`
+
+        const userContent = `Generate ${count} ${difficulty} level ${type} questions for the subject ${subject} on the topic of ${topic || 'general awareness'}. Ensure the JSON output provides the exact structure requested.`
+
+        let data;
+        let provider = 'Groq';
+        try {
+            data = await fetchFromGroq(systemContent, userContent)
+        } catch (err) {
+            console.error('Groq generation failed, falling back to OpenAI:', err)
+            provider = 'OpenAI';
+            data = await fetchFromOpenAI(systemContent, userContent)
+        }
+
+        const rawContent = data.choices[0].message.content
+        const parsedData = JSON.parse(rawContent)
+
+        // Handle variations in AI output shapes
+        const questions = parsedData.questions || parsedData.data || parsedData
+
+        return NextResponse.json({
+            success: true,
+            data: Array.isArray(questions) ? questions : [parsedData],
+            provider: provider,
+            message: `Generated ${Array.isArray(questions) ? questions.length : 1} ${type} questions for ${subject} using ${provider}`,
+        })
+    } catch (error) {
+        console.error('AI question generation error:', error)
+        return NextResponse.json({ error: 'Failed to generate questions. Please check AI service limits or try again.' }, { status: 500 })
     }
-
-    // You could track generated questions here for billing/limits
-    // const limitCheck = checkPlanLimit(user!.tenantId, 'maxAIQuestions', currentCount + parseInt(count))
-
-    // In production, call OpenAI or Gemini here
-    const questions = generateMockQuestions(subject, topic, parseInt(count), difficulty, type)
-
-    return NextResponse.json({
-        success: true,
-        data: questions,
-        message: `Generated ${questions.length} ${type} questions for ${subject}`,
-    })
 }
+
