@@ -9,7 +9,15 @@ export async function GET(req: NextRequest) {
     try {
         const affiliates = await prisma.affiliate.findMany({
             include: {
-                referrals: true,
+                referrals: {
+                    include: {
+                        tenant: {
+                            include: {
+                                subscriptions: true
+                            }
+                        }
+                    }
+                },
                 payouts: true,
                 subscriptionCommissions: { where: { status: 'PENDING' } },
                 marketplaceCommissions: { where: { status: 'PENDING' } }
@@ -28,6 +36,21 @@ export async function GET(req: NextRequest) {
                 code: a.affiliateCode,
                 status: a.status,
                 totalReferred: a.referrals.length,
+                referrals: a.referrals.map(r => {
+                    const latestSub = r.tenant.subscriptions[0];
+                    return {
+                        id: r.id,
+                        tenantName: r.tenant.name,
+                        tenantEmail: r.tenant.email,
+                        tenantPhone: r.tenant.phone,
+                        status: r.status,
+                        referralDate: r.referralDate,
+                        subscriptionPlan: latestSub?.plan || 'NONE',
+                        subscriptionStatus: latestSub?.status || 'NONE',
+                        trialEndsAt: latestSub?.trialEndsAt,
+                        currentPeriodEnd: latestSub?.currentPeriodEnd
+                    };
+                }),
                 pendingSubscriptionCommission: pendingSubAmount,
                 pendingMarketplaceCommission: pendingMktAmount,
                 totalPendingUnaggregated: pendingSubAmount + pendingMktAmount,

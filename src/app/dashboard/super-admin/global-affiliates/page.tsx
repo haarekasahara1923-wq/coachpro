@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 
 export default function SuperAdminAffiliates() {
     const [data, setData] = useState<any>(null)
@@ -7,6 +7,7 @@ export default function SuperAdminAffiliates() {
     const [aggregating, setAggregating] = useState(false)
     const [payingId, setPayingId] = useState<string | null>(null)
     const [txnRef, setTxnRef] = useState('')
+    const [expandedAffiliateId, setExpandedAffiliateId] = useState<string | null>(null)
 
     useEffect(() => {
         fetchData()
@@ -115,21 +116,66 @@ export default function SuperAdminAffiliates() {
                         </thead>
                         <tbody>
                             {data.affiliates.map((a: any) => (
-                                <tr key={a.id}>
-                                    <td>
-                                        <div style={{ fontWeight: '600' }}>{a.name}</div>
-                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{a.email}</div>
-                                        <span className="badge" style={{ background: 'var(--surface-2)', marginTop: '4px', fontSize: '10px' }}>
-                                            Code: {a.code}
-                                        </span>
-                                    </td>
-                                    <td>{a.totalReferred} tenants</td>
-                                    <td>₹{a.pendingSubscriptionCommission.toLocaleString()}</td>
-                                    <td>₹{a.pendingMarketplaceCommission.toLocaleString()}</td>
-                                    <td style={{ textAlign: 'right', fontWeight: '700', color: '#fbbf24' }}>
-                                        ₹{a.totalPendingUnaggregated.toLocaleString()}
-                                    </td>
-                                </tr>
+                                <React.Fragment key={a.id}>
+                                    <tr onClick={() => setExpandedAffiliateId(expandedAffiliateId === a.id ? null : a.id)} style={{ cursor: 'pointer', background: expandedAffiliateId === a.id ? 'var(--surface-2)' : 'transparent' }}>
+                                        <td>
+                                            <div style={{ fontWeight: '600', color: 'var(--primary-light)' }}>{a.name}</div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{a.email}</div>
+                                            <span className="badge" style={{ background: 'var(--surface-2)', marginTop: '4px', fontSize: '10px' }}>
+                                                Code: {a.code}
+                                            </span>
+                                        </td>
+                                        <td>{a.totalReferred} tenants <span style={{ fontSize: '10px', marginLeft: '4px' }}>▼</span></td>
+                                        <td>₹{a.pendingSubscriptionCommission.toLocaleString()}</td>
+                                        <td>₹{a.pendingMarketplaceCommission.toLocaleString()}</td>
+                                        <td style={{ textAlign: 'right', fontWeight: '700', color: '#fbbf24' }}>
+                                            ₹{a.totalPendingUnaggregated.toLocaleString()}
+                                        </td>
+                                    </tr>
+                                    {expandedAffiliateId === a.id && (
+                                        <tr>
+                                            <td colSpan={5} style={{ padding: '0 24px 24px 24px', background: 'var(--surface-2)' }}>
+                                                <div style={{ background: 'var(--surface)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                                    <h3 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: 'white' }}>Referred Tenants ({a.referrals?.length || 0})</h3>
+                                                    {a.referrals?.length > 0 ? (
+                                                        <table className="table" style={{ background: 'transparent' }}>
+                                                            <thead>
+                                                                <tr>
+                                                                    <th style={{ background: 'transparent', padding: '8px' }}>Tenant Name</th>
+                                                                    <th style={{ background: 'transparent', padding: '8px' }}>Signup Date</th>
+                                                                    <th style={{ background: 'transparent', padding: '8px' }}>Referral Status</th>
+                                                                    <th style={{ background: 'transparent', padding: '8px' }}>Subscription</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {a.referrals.map((r: any) => (
+                                                                    <tr key={r.id}>
+                                                                        <td style={{ padding: '8px' }}>
+                                                                            <div style={{ fontWeight: '600' }}>{r.tenantName}</div>
+                                                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{r.tenantPhone}</div>
+                                                                        </td>
+                                                                        <td style={{ padding: '8px' }}>{new Date(r.referralDate).toLocaleDateString()}</td>
+                                                                        <td style={{ padding: '8px' }}>
+                                                                            <span className={`badge ${r.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}`}>
+                                                                                {r.status}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td style={{ padding: '8px' }}>
+                                                                            <div style={{ fontSize: '13px' }}>{r.subscriptionPlan}</div>
+                                                                            <div style={{ fontSize: '11px', color: r.subscriptionStatus === 'ACTIVE' ? 'var(--success)' : 'var(--text-muted)' }}>{r.subscriptionStatus}</div>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    ) : (
+                                                        <div style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>No tenants referred yet.</div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
                             ))}
                             {data.affiliates.length === 0 && (
                                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No affiliates found</td></tr>
