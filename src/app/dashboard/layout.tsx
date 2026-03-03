@@ -112,6 +112,28 @@ function DashboardSidebar({ open, onClose }: { open: boolean; onClose: () => voi
                         </div>
                     ))}
 
+                    {/* Launch Website CTA */}
+                    <a href="https://wapiflow.site" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', margin: '24px 8px 12px 8px', display: 'block' }}>
+                        <div style={{ padding: '14px 16px', background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)', borderRadius: '12px', color: 'white', cursor: 'pointer', transition: 'all 0.3s ease', boxShadow: '0 4px 15px rgba(255, 107, 107, 0.4)', position: 'relative', overflow: 'hidden' }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.transform = 'translateY(-3px)';
+                                e.currentTarget.style.boxShadow = '0 8px 25px rgba(255, 107, 107, 0.6)';
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 4px 15px rgba(255, 107, 107, 0.4)';
+                            }}
+                        >
+                            <div style={{ position: 'absolute', right: '-5px', bottom: '-15px', fontSize: '50px', opacity: '0.2', transform: 'rotate(-15deg)' }}>🚀</div>
+                            <div style={{ fontSize: '14px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', position: 'relative', zIndex: 1, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                                <span style={{ fontSize: '18px' }}>🚀</span> Launch Your Website
+                            </div>
+                            <div style={{ fontSize: '12px', opacity: 0.95, marginTop: '6px', fontWeight: '600', position: 'relative', zIndex: 1 }}>
+                                Go online & attract students!
+                            </div>
+                        </div>
+                    </a>
+
                     {/* Subscription badge - hide for super admin */}
                     {!isSuperAdmin && (
                         <Link href="/dashboard/subscription" style={{ textDecoration: 'none' }}>
