@@ -76,11 +76,12 @@ export default function LandingPage() {
         </div>
 
         <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-          {['Features', 'Pricing', 'About', 'Contact'].map(item => (
+          {['Features', 'Pricing', 'About'].map(item => (
             <a key={item} href={`#${item.toLowerCase()}`} style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500', textDecoration: 'none', transition: 'color 0.2s' }}
               onMouseEnter={e => (e.target as HTMLElement).style.color = 'white'}
               onMouseLeave={e => (e.target as HTMLElement).style.color = 'var(--text-secondary)'}>{item}</a>
           ))}
+          <Link href="/affiliate-register" style={{ color: '#10b981', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}>Partner Program</Link>
         </div>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -206,6 +207,10 @@ export default function LandingPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '16px' }}>
           <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #6366f1, #ec4899)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>🎓</div>
           <span style={{ fontWeight: '800', fontSize: '16px' }}>CoachPro</span>
+        </div>
+        <div style={{ display: 'flex', gap: '24px', justifyContent: 'center', marginBottom: '16px', fontSize: '14px' }}>
+          <Link href="/affiliate-register" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>Become an Affiliate (Earn 40%)</Link>
+          <Link href="/affiliate-login" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Affiliate Login</Link>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
           © 2025 CoachPro. Made with ❤️ in India. All rights reserved.
