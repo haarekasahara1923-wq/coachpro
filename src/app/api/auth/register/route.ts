@@ -5,7 +5,7 @@ import { slugify } from '@/lib/utils'
 
 export async function POST(req: NextRequest) {
     try {
-        const { name, email, password, phone, coachingName, plan } = await req.json()
+        const { name, email, password, phone, coachingName, plan, ref } = await req.json()
 
         if (!name || !email || !password || !coachingName) {
             return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
@@ -41,6 +41,24 @@ export async function POST(req: NextRequest) {
                     isActive: true,
                 }
             })
+
+            let affiliateObj = null;
+            if (ref) {
+                affiliateObj = await tx.affiliate.findUnique({ where: { affiliateCode: ref } });
+                if (affiliateObj) {
+                    await tx.tenant.update({
+                        where: { id: tenant.id },
+                        data: { affiliateId: affiliateObj.id }
+                    });
+                    await tx.affiliateReferral.create({
+                        data: {
+                            affiliateId: affiliateObj.id,
+                            tenantId: tenant.id,
+                            status: 'PENDING',
+                        }
+                    });
+                }
+            }
 
             const user = await tx.user.create({
                 data: {

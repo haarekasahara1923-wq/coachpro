@@ -35,13 +35,33 @@ export async function POST(req: Request) {
 
         // Process affiliate commission
         if (order.affiliateTenantId && order.commissionAmount > 0) {
-            await prisma.tenant.update({
+            const tenantObj = await prisma.tenant.update({
                 where: { id: order.affiliateTenantId },
                 data: {
                     totalEarnings: { increment: order.commissionAmount },
                     availableBalance: { increment: order.commissionAmount }
-                }
-            })
+                },
+                select: { affiliateId: true, id: true }
+            });
+
+            if (tenantObj.affiliateId) {
+                const now = new Date();
+                const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                await prisma.affiliateMarketplaceCommission.upsert({
+                    where: { orderId: dbOrderId },
+                    update: {},
+                    create: {
+                        affiliateId: tenantObj.affiliateId,
+                        tenantId: tenantObj.id,
+                        orderId: dbOrderId,
+                        orderAmount: order.amount,
+                        commissionPercentage: 20,
+                        commissionAmount: order.amount * 0.20,
+                        month: monthStr,
+                        status: 'PENDING'
+                    }
+                });
+            }
         }
 
         // Send Google Drive link to buyer via email (using simple fetch to email API)

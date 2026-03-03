@@ -56,6 +56,15 @@ const superAdminNav = [
             { href: '/dashboard/super-admin/tenants', icon: '🏗️', label: 'All Tenants' },
             { href: '/dashboard/super-admin/subscriptions', icon: '💎', label: 'Subscriptions' },
             { href: '/dashboard/super-admin/gyankosh', icon: '🛒', label: 'Gyankosh Admin' },
+            { href: '/dashboard/super-admin/global-affiliates', icon: '💸', label: 'Global Affiliates' },
+        ]
+    },
+]
+
+const globalAffiliateNav = [
+    {
+        group: 'AFFILIATE', items: [
+            { href: '/dashboard/global-affiliate', icon: '💰', label: 'Earnings Overview' },
         ]
     },
 ]
@@ -64,7 +73,8 @@ function DashboardSidebar({ open, onClose }: { open: boolean; onClose: () => voi
     const pathname = usePathname()
     const { user, tenant, subscription, logout } = useAuth()
     const isSuperAdmin = user?.role === 'SUPER_ADMIN'
-    const allNavItems = isSuperAdmin ? superAdminNav : navItems
+    const isAffiliate = user?.role === 'AFFILIATE'
+    const allNavItems = isSuperAdmin ? superAdminNav : (isAffiliate ? globalAffiliateNav : navItems)
 
     const currentPlan = subscription?.plan || 'BASIC'
 
@@ -78,7 +88,7 @@ function DashboardSidebar({ open, onClose }: { open: boolean; onClose: () => voi
                     <div>
                         <div style={{ fontSize: '14px', fontWeight: '800', color: 'white' }}>CoachPro</div>
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {isSuperAdmin ? 'Super Admin Portal' : (tenant?.name || 'Loading...')}
+                            {isSuperAdmin ? 'Super Admin Portal' : (isAffiliate ? 'Affiliate Partner' : (tenant?.name || 'Loading...'))}
                         </div>
                     </div>
                 </div>
@@ -134,8 +144,8 @@ function DashboardSidebar({ open, onClose }: { open: boolean; onClose: () => voi
                         </div>
                     </a>
 
-                    {/* Subscription badge - hide for super admin */}
-                    {!isSuperAdmin && (
+                    {/* Subscription badge - hide for super admin and affiliates */}
+                    {!isSuperAdmin && !isAffiliate && (
                         <Link href="/dashboard/subscription" style={{ textDecoration: 'none' }}>
                             <div style={{ margin: '12px 8px', padding: '12px', background: 'rgba(99,102,241,0.1)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.2)', cursor: 'pointer', transition: 'background 0.2s' }}
                                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.15)'}
@@ -197,6 +207,8 @@ function DashboardHeader({ onMenuClick }: { onMenuClick: () => void }) {
             '/dashboard/super-admin/tenants': 'All Tenants',
             '/dashboard/super-admin/subscriptions': 'Subscriptions',
             '/dashboard/super-admin/gyankosh': 'Gyankosh Admin',
+            '/dashboard/super-admin/global-affiliates': 'Global Affiliates',
+            '/dashboard/global-affiliate': 'Affiliate Dashboard',
         }
         return map[pathname] || 'Dashboard'
     }

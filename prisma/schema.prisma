@@ -55,6 +55,100 @@ model Tenant {
   
   affiliateOrders   GyankoshOrder[] @relation("TenantAffiliateOrders")
   withdrawals       AffiliateWithdrawal[]
+
+  // Global Affiliate System
+  affiliateId       String?
+  referralLocked    Boolean @default(false)
+  affiliate         Affiliate? @relation(fields: [affiliateId], references: [id])
+  globalAffiliateReferral  AffiliateReferral?
+  globalAffiliateSubscriptionCommissions AffiliateSubscriptionCommission[]
+  globalAffiliateMarketplaceCommissions  AffiliateMarketplaceCommission[]
+}
+
+model Affiliate {
+  id                    String   @id @default(cuid())
+  name                  String
+  email                 String   @unique
+  phone                 String?  
+  password              String
+  affiliateCode         String   @unique
+  bankAccountNumber     String?
+  ifscCode              String?
+  upiId                 String?
+  status                String   @default("ACTIVE") // ACTIVE, BLOCKED
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenants               Tenant[]
+  referrals             AffiliateReferral[]
+  subscriptionCommissions AffiliateSubscriptionCommission[]
+  marketplaceCommissions  AffiliateMarketplaceCommission[]
+  payouts               AffiliatePayout[]
+}
+
+model AffiliateReferral {
+  id               String   @id @default(cuid())
+  affiliateId      String
+  tenantId         String   @unique
+  referralDate     DateTime @default(now())
+  status           String   @default("PENDING") // PENDING, ACTIVE, CANCELLED
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  affiliate        Affiliate @relation(fields: [affiliateId], references: [id])
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+}
+
+model AffiliateSubscriptionCommission {
+  id                    String   @id @default(cuid())
+  affiliateId           String
+  tenantId              String
+  subscriptionId        String?
+  paymentAmount         Float
+  commissionPercentage  Float
+  commissionAmount      Float
+  commissionType        String   // FIRST_TIME, RECURRING
+  month                 String   // e.g., 'YYYY-MM'
+  status                String   @default("PENDING") // PENDING, APPROVED, PAID
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  affiliate             Affiliate @relation(fields: [affiliateId], references: [id])
+  tenant                Tenant    @relation(fields: [tenantId], references: [id])
+}
+
+model AffiliateMarketplaceCommission {
+  id                    String   @id @default(cuid())
+  affiliateId           String
+  tenantId              String
+  orderId               String    @unique
+  orderAmount           Float
+  commissionPercentage  Float    @default(20.0)
+  commissionAmount      Float
+  month                 String   // e.g., 'YYYY-MM'
+  status                String   @default("PENDING") // PENDING, APPROVED, PAID
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  affiliate             Affiliate @relation(fields: [affiliateId], references: [id])
+  tenant                Tenant    @relation(fields: [tenantId], references: [id])
+  order                 GyankoshOrder @relation(fields: [orderId], references: [id])
+}
+
+model AffiliatePayout {
+  id                           String   @id @default(cuid())
+  affiliateId                  String
+  month                        String   // e.g., 'YYYY-MM'
+  totalSubscriptionCommission  Float    @default(0)
+  totalMarketplaceCommission   Float    @default(0)
+  totalPayoutAmount            Float    @default(0)
+  payoutStatus                 String   @default("PENDING") // PENDING, PAID
+  payoutDate                   DateTime?
+  transactionReference         String?
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+
+  affiliate                    Affiliate @relation(fields: [affiliateId], references: [id])
 }
 
 model User {
@@ -85,6 +179,7 @@ enum UserRole {
   STAFF
   STUDENT
   PARENT
+  AFFILIATE
 }
 
 model Branch {
@@ -573,6 +668,7 @@ model GyankoshOrder {
 
   product         GyankoshProduct @relation(fields: [productId], references: [id])
   tenant          Tenant?         @relation("TenantAffiliateOrders", fields: [affiliateTenantId], references: [id])
+  globalAffiliateCommission AffiliateMarketplaceCommission?
 }
 
 enum OrderStatus {
