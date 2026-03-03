@@ -212,6 +212,26 @@ function DashboardHeader({ onMenuClick }: { onMenuClick: () => void }) {
                 </div>
             </div>
 
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, justifyContent: 'flex-end', padding: '0 16px' }}>
+                {/* Global Student Search Bar */}
+                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-2)', padding: '6px 14px', borderRadius: '12px', border: '1px solid var(--border)', maxWidth: '300px', width: '100%', gap: '8px' }}>
+                    <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>🔍</span>
+                    <input
+                        type="text"
+                        placeholder="Search student by name or mobile..."
+                        style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-primary)', fontSize: '13px', width: '100%' }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                const val = e.currentTarget.value;
+                                if (val) {
+                                    window.location.href = `/dashboard/students?search=${encodeURIComponent(val)}`;
+                                }
+                            }
+                        }}
+                    />
+                </div>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', display: 'inline-block' }} />
