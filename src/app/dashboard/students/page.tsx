@@ -62,15 +62,20 @@ export default function StudentsPage() {
             {/* Search & Filter */}
             <div className="card" style={{ marginBottom: '20px', padding: '16px' }}>
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, minWidth: '200px' }}>
+                    <div style={{ flex: 1, minWidth: '200px', display: 'flex', gap: '8px' }}>
                         <input
                             className="input"
-                            placeholder="🔍 Search by name, phone, or student ID..."
+                            style={{ flex: 1 }}
+                            placeholder="🔍 Search by student name or mobile no..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && fetchStudents()}
                         />
+                        <button className="btn btn-primary" onClick={fetchStudents} style={{ whiteSpace: 'nowrap' }}>
+                            🔍 Search
+                        </button>
                     </div>
-                    <button className="btn btn-secondary" onClick={fetchStudents}>🔄 Refresh</button>
+                    <button className="btn btn-secondary" onClick={() => { setSearch(''); setTimeout(fetchStudents, 0); }}>🔄 Refresh</button>
                 </div>
             </div>
 
