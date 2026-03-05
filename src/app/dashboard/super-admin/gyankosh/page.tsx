@@ -11,6 +11,7 @@ export default function AdminGyankosh() {
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'withdrawals'>('products')
     const [showModal, setShowModal] = useState(false)
+    const [editingId, setEditingId] = useState<string | null>(null)
     const [uploading, setUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [formData, setFormData] = useState({
@@ -37,14 +38,22 @@ export default function AdminGyankosh() {
         setLoading(false)
     }
 
-    const handleCreateProduct = async () => {
+    const handleSaveProduct = async () => {
         if (!formData.title || formData.price <= 0) { alert('Title and Price are required.'); return }
         try {
+            const body = editingId ? { ...formData, id: editingId, action: 'edit' } : formData
+            const method = editingId ? 'PUT' : 'POST'
             const res = await fetch('/api/super-admin/gyankosh/products', {
-                method: 'POST', headers: authHeaders, body: JSON.stringify(formData)
+                method, headers: authHeaders, body: JSON.stringify(body)
             })
-            if (res.ok) { alert('Product created!'); setShowModal(false); setFormData({ title: '', description: '', category: 'COURSE_MATERIAL', price: 0, discount: 0, imageUrl: '', fileUrl: '' }); fetchData() }
-            else alert('Failed to create product.')
+            if (res.ok) {
+                alert(editingId ? 'Product updated!' : 'Product created!')
+                setShowModal(false)
+                setEditingId(null)
+                setFormData({ title: '', description: '', category: 'COURSE_MATERIAL', price: 0, discount: 0, imageUrl: '', fileUrl: '' })
+                fetchData()
+            }
+            else alert('Failed to save product.')
         } catch (e) { console.error(e) }
     }
 
@@ -81,7 +90,7 @@ export default function AdminGyankosh() {
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h2 style={{ fontSize: '24px', fontWeight: 'bold' }}>🛒 Gyankosh Administration</h2>
-                <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Add Product</button>
+                <button className="btn btn-primary" onClick={() => { setEditingId(null); setFormData({ title: '', description: '', category: 'COURSE_MATERIAL', price: 0, discount: 0, imageUrl: '', fileUrl: '' }); setShowModal(true); }}>+ Add Product</button>
             </div>
 
             {/* Tabs */}
@@ -120,9 +129,14 @@ export default function AdminGyankosh() {
                                             <span className={`badge ${p.isActive ? 'badge-success' : 'badge-danger'}`}>{p.isActive ? 'Active' : 'Inactive'}</span>
                                         </td>
                                         <td>
-                                            <button className="btn btn-sm btn-secondary" style={{ fontSize: '12px', padding: '4px 8px' }} onClick={() => handleToggleProduct(p.id, p.isActive)}>
-                                                {p.isActive ? '⛔ Disable' : '✅ Enable'}
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button className="btn btn-sm btn-primary" style={{ fontSize: '12px', padding: '4px 8px' }} onClick={() => { setEditingId(p.id); setFormData({ title: p.title, description: p.description || '', category: p.category, price: p.price, discount: p.discount, imageUrl: p.imageUrl || '', fileUrl: p.fileUrl || '' }); setShowModal(true); }}>
+                                                    ✏️ Edit
+                                                </button>
+                                                <button className="btn btn-sm btn-secondary" style={{ fontSize: '12px', padding: '4px 8px' }} onClick={() => handleToggleProduct(p.id, p.isActive)}>
+                                                    {p.isActive ? '⛔ Disable' : '✅ Enable'}
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -200,13 +214,13 @@ export default function AdminGyankosh() {
                 </div>
             )}
 
-            {/* Add Product Modal */}
+            {/* Add/Edit Product Modal */}
             {showModal && (
-                <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
+                <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setShowModal(false); setEditingId(null); } }}>
                     <div className="modal" style={{ width: '550px' }}>
                         <div className="modal-header">
-                            <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>📦 Add New Digital Product</h2>
-                            <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+                            <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>{editingId ? '✏️ Edit Digital Product' : '📦 Add New Digital Product'}</h2>
+                            <button onClick={() => { setShowModal(false); setEditingId(null); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '20px', cursor: 'pointer' }}>✕</button>
                         </div>
                         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: 'calc(90vh - 140px)', overflowY: 'auto' }}>
                             <div>
@@ -295,8 +309,8 @@ export default function AdminGyankosh() {
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                            <button className="btn btn-primary" onClick={handleCreateProduct}>Save Product</button>
+                            <button className="btn btn-secondary" onClick={() => { setShowModal(false); setEditingId(null); }}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handleSaveProduct}>{editingId ? 'Update Product' : 'Save Product'}</button>
                         </div>
                     </div>
                 </div>

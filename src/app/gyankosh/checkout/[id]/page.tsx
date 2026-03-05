@@ -104,9 +104,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                                 <h3 style={{ color: 'white', fontSize: '16px' }}>{product.title}</h3>
                                 <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>{product.category}</p>
                             </div>
-                            <div style={{ textAlign: 'right' }}>
-                                {product.discount > 0 && <div style={{ fontSize: '12px', color: 'var(--text-muted)', textDecoration: 'line-through' }}>₹{product.price}</div>}
-                                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981' }}>₹{finalPrice}</div>
+                            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
+                                {product.discount > 0 && <div style={{ fontSize: '14px', color: 'var(--text-muted)', textDecoration: 'line-through' }}>₹{product.price}</div>}
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>₹{finalPrice}</div>
                             </div>
                         </div>
 

@@ -67,6 +67,22 @@ export async function PUT(req: NextRequest) {
             return NextResponse.json(product)
         }
 
+        if (body.action === 'edit') {
+            const product = await prisma.gyankoshProduct.update({
+                where: { id: body.id },
+                data: {
+                    title: body.title,
+                    description: body.description,
+                    category: body.category,
+                    price: body.price,
+                    discount: body.discount || 0,
+                    imageUrl: body.imageUrl || '',
+                    fileUrl: body.fileUrl || '',
+                }
+            })
+            return NextResponse.json(product)
+        }
+
         return NextResponse.json({ error: 'Invalid' }, { status: 400 })
     } catch (error) {
         return NextResponse.json({ error: 'Failed' }, { status: 500 })

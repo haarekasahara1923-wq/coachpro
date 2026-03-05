@@ -140,12 +140,12 @@ function GyankoshMarketplaceContent() {
                                         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: 'auto' }}>
                                             <div>
                                                 {product.discount > 0 ? (
-                                                    <>
-                                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', textDecoration: 'line-through' }}>₹{product.price}</div>
-                                                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>₹{discountedPrice}</div>
-                                                    </>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span style={{ fontSize: '14px', color: 'var(--text-muted)', textDecoration: 'line-through' }}>₹{product.price}</span>
+                                                        <span style={{ fontSize: '22px', fontWeight: 'bold', color: '#10b981' }}>₹{discountedPrice}</span>
+                                                    </div>
                                                 ) : (
-                                                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>₹{product.price}</div>
+                                                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#10b981' }}>₹{product.price}</div>
                                                 )}
                                             </div>
                                             <Link href={`/gyankosh/checkout/${product.id}`} style={{
