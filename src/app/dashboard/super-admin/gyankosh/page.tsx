@@ -203,9 +203,12 @@ export default function AdminGyankosh() {
             {/* Add Product Modal */}
             {showModal && (
                 <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
-                    <div className="modal-content" style={{ width: '550px' }}>
-                        <h2 style={{ marginBottom: '20px' }}>📦 Add New Digital Product</h2>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div className="modal" style={{ width: '550px' }}>
+                        <div className="modal-header">
+                            <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>📦 Add New Digital Product</h2>
+                            <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+                        </div>
+                        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: 'calc(90vh - 140px)', overflowY: 'auto' }}>
                             <div>
                                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: '600' }}>Product Title *</label>
                                 <input type="text" className="input" style={{ width: '100%' }} value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g., NEET Physics Complete Notes" />
@@ -291,7 +294,7 @@ export default function AdminGyankosh() {
                                 </p>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+                        <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                             <button className="btn btn-primary" onClick={handleCreateProduct}>Save Product</button>
                         </div>
