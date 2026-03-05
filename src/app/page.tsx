@@ -84,12 +84,37 @@ export default function LandingPage() {
           <Link href="/affiliate-register" style={{ color: '#10b981', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}>Partner Program</Link>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div className="hide-mobile" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <Link href="/gyankosh" className="btn" style={{ padding: '8px 18px', fontSize: '13px', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>📚 GYANKOSH</Link>
           <Link href="/login" className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Login</Link>
           <Link href="/register" className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '13px' }}>Free Trial 🚀</Link>
         </div>
+
+        <div className="show-mobile" style={{ alignItems: 'center' }}>
+          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="btn btn-secondary" style={{ padding: '8px', minWidth: '40px', justifyContent: 'center', fontSize: '18px' }}>
+            {mobileMenuOpen ? '✕' : '☰'}
+          </button>
+        </div>
       </nav>
+
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="mobile-menu fade-in" style={{
+          position: 'fixed', top: '64px', left: 0, right: 0, zIndex: 99,
+          background: 'var(--surface)', borderBottom: '1px solid var(--border)',
+          padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+        }}>
+          {['Features', 'Pricing', 'About'].map(item => (
+            <a key={item} href={`#${item.toLowerCase()}`} onClick={() => setMobileMenuOpen(false)} style={{ color: 'var(--text-primary)', fontSize: '16px', fontWeight: '600', textDecoration: 'none' }}>{item}</a>
+          ))}
+          <Link href="/affiliate-register" onClick={() => setMobileMenuOpen(false)} style={{ color: '#10b981', fontSize: '16px', fontWeight: '600', textDecoration: 'none' }}>Partner Program</Link>
+          <div style={{ height: '1px', background: 'var(--border)', margin: '8px 0' }}></div>
+          <Link href="/gyankosh" onClick={() => setMobileMenuOpen(false)} className="btn" style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', fontWeight: 'bold' }}>📚 GYANKOSH</Link>
+          <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>Login</Link>
+          <Link href="/register" onClick={() => setMobileMenuOpen(false)} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>Free Trial 🚀</Link>
+        </div>
+      )}
 
       {/* Hero */}
       <section style={{ paddingTop: '120px', paddingBottom: '80px', textAlign: 'center', maxWidth: '900px', margin: '0 auto', padding: '140px 24px 80px' }}>
@@ -118,7 +143,7 @@ export default function LandingPage() {
 
       {/* Stats */}
       <section style={{ padding: '40px 24px', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', textAlign: 'center' }}>
+        <div className="stats-grid" style={{ maxWidth: '900px', margin: '0 auto', textAlign: 'center' }}>
           {stats.map(stat => (
             <div key={stat.label}>
               <div style={{ fontSize: '32px', fontWeight: '900', color: 'white' }}>{stat.value}</div>
@@ -208,7 +233,7 @@ export default function LandingPage() {
           <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #6366f1, #ec4899)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>🎓</div>
           <span style={{ fontWeight: '800', fontSize: '16px' }}>CoachPro</span>
         </div>
-        <div style={{ display: 'flex', gap: '24px', justifyContent: 'center', marginBottom: '16px', fontSize: '14px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', marginBottom: '16px', fontSize: '14px' }}>
           <Link href="/affiliate-register" style={{ color: '#10b981', textDecoration: 'none', fontWeight: '600' }}>Become an Affiliate (Earn 40%)</Link>
           <Link href="/affiliate-login" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Affiliate Login</Link>
         </div>

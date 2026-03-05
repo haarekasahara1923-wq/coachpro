@@ -597,6 +597,10 @@ tr:hover td {
   margin-top: 4px;
 }
 
+.show-mobile {
+  display: none !important;
+}
+
 /* Mobile responsive */
 @media (max-width: 768px) {
   :root {
@@ -632,7 +636,11 @@ tr:hover td {
   }
 
   .hide-mobile {
-    display: none;
+    display: none !important;
+  }
+
+  .show-mobile {
+    display: flex !important;
   }
 }
 
@@ -712,6 +720,19 @@ tr:hover td {
   .grid-cols-3,
   .grid-cols-4 {
     grid-template-columns: 1fr;
+  }
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
   }
 }
 
