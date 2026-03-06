@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth, requireFeature } from '@/app/api/middleware'
+import { requireAuth } from '@/app/api/middleware'
 
 async function fetchFromGroq(systemContent: string, userContent: string) {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -37,9 +37,7 @@ export async function POST(req: NextRequest) {
     const { error, user } = requireAuth(req)
     if (error) return error
 
-    // Feature gate check: User needs Pro/Elite plan for AI tools
-    const featureCheck = requireFeature(req, 'aiTools')
-    if (featureCheck.error) return featureCheck.error
+    // AI Generator is explicitly available for all plans including BASIC
 
     try {
         const body = await req.json()

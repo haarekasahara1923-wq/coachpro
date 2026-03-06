@@ -115,7 +115,7 @@ export default function AIGeneratorModal({ isOpen, onClose }: AIGeneratorModalPr
             <div style={modalStyle}>
                 <div style={headerStyle}>
                     <h2 style={{ margin: 0, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '24px' }}>✨</span> AI Content Generator
+                        <span style={{ fontSize: '24px' }}>✨</span> AI Assistant
                     </h2>
                     <button
                         onClick={onClose}

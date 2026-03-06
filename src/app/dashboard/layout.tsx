@@ -232,7 +232,7 @@ function DashboardHeader({ onMenuClick }: { onMenuClick: () => void }) {
                     className="btn btn-primary"
                     style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', gap: '6px', padding: '8px 16px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
                 >
-                    ✨ AI Generator
+                    ✨ AI Assistant
                 </button>
                 {/* Global Student Search Bar */}
                 <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-2)', padding: '6px 14px', borderRadius: '12px', border: '1px solid var(--border)', maxWidth: '300px', width: '100%', gap: '8px' }}>
