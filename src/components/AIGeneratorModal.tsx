@@ -67,6 +67,36 @@ export default function AIGeneratorModal({ isOpen, onClose }: AIGeneratorModalPr
         }
     }
 
+    const handleDownloadWord = () => {
+        if (!result || !contentRef.current) return;
+        const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export HTML To Doc</title></head><body>";
+        const footer = "</body></html>";
+        const sourceHTML = header + contentRef.current.innerHTML + footer;
+
+        const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+        const fileDownload = document.createElement("a");
+        document.body.appendChild(fileDownload);
+        fileDownload.href = source;
+        fileDownload.download = `${contentType.replace(/\s+/g, '_').toLowerCase()}_generated.doc`;
+        fileDownload.click();
+        document.body.removeChild(fileDownload);
+    }
+
+    const handleDownloadExcel = () => {
+        if (!result || !contentRef.current) return;
+        const header = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>';
+        const footer = '</body></html>';
+        const sourceHTML = header + contentRef.current.innerHTML + footer;
+
+        const source = 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(sourceHTML);
+        const fileDownload = document.createElement("a");
+        document.body.appendChild(fileDownload);
+        fileDownload.href = source;
+        fileDownload.download = `${contentType.replace(/\s+/g, '_').toLowerCase()}_generated.xls`;
+        fileDownload.click();
+        document.body.removeChild(fileDownload);
+    }
+
     // Modal styles
     const overlayStyle: React.CSSProperties = {
         position: 'fixed',
@@ -182,11 +212,21 @@ export default function AIGeneratorModal({ isOpen, onClose }: AIGeneratorModalPr
                     {result && (
                         <div style={{ marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                                <h3 style={{ margin: 0, fontSize: '18px' }}>✅ Generated {contentType}</h3>
-                                <button
-                                    onClick={handleDownloadPDF}
-                                    style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-                                >⬇️ Download PDF</button>
+                                <h3 style={{ margin: 0, fontSize: '18px' }}>✅ Preview {contentType}</h3>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        onClick={handleDownloadPDF}
+                                        style={{ padding: '8px 12px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}
+                                    >⬇️ PDF</button>
+                                    <button
+                                        onClick={handleDownloadWord}
+                                        style={{ padding: '8px 12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}
+                                    >⬇️ DOCX</button>
+                                    <button
+                                        onClick={handleDownloadExcel}
+                                        style={{ padding: '8px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}
+                                    >⬇️ Excel</button>
+                                </div>
                             </div>
 
                             <div
@@ -200,9 +240,11 @@ export default function AIGeneratorModal({ isOpen, onClose }: AIGeneratorModalPr
                                     overflowY: 'auto'
                                 }}
                             >
-                                <div ref={contentRef} style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: '1.6', fontSize: '15px', color: 'black' }}>
-                                    {result}
-                                </div>
+                                <div
+                                    ref={contentRef}
+                                    style={{ fontFamily: 'inherit', lineHeight: '1.6', fontSize: '15px', color: 'black' }}
+                                    dangerouslySetInnerHTML={{ __html: result }}
+                                />
                             </div>
                         </div>
                     )}

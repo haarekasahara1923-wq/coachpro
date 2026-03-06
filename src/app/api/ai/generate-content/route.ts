@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json()
-        const { prompt, contentType, format = 'Markdown' } = body
+        const { prompt, contentType } = body
 
         if (!prompt) {
             return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
@@ -50,8 +50,11 @@ export async function POST(req: NextRequest) {
         const systemContent = `You are an expert AI Assistant for a coaching center. 
 Your task is to generate high-quality educational content based on the user's request. 
 The requested content type is: ${contentType}. 
-You should format your entire response in clear ${format}. 
-Do not include any preamble, just output the requested content directly.`
+You MUST format your ONLY response in pure, clean HTML code, ready to be rendered in a webpage without ANY markdown syntax or \`\`\`html wrapping.
+Use proper HTML tags: <h1>, <h2>, <h3>, <p>, <ul>, <ol>, <li>, <table>, <tr>, <th>, <td>, <strong>, <em>, <br/>.
+For Question Papers or any list-based items, group them nicely. For tabular data, always use standard HTML <table> structure.
+DO NOT include <head>, <body>, or <html> tags. Just the internal HTML structure. Make the design aesthetically pleasing using inline CSS where extremely helpful, but mostly stick to semantic HTML.
+Important: Never include \\\`\\\`\\\`html at the start or end of your response.`
 
         const userContent = prompt
 
@@ -65,7 +68,10 @@ Do not include any preamble, just output the requested content directly.`
             data = await fetchFromOpenAI(systemContent, userContent)
         }
 
-        const rawContent = data.choices[0].message.content
+        let rawContent = data.choices[0].message.content
+
+        // Remove markdown formatting if AI still decided to include it
+        rawContent = rawContent.replace(/\`\`\`html/gi, "").replace(/\`\`\`/g, "").trim();
 
         return NextResponse.json({
             success: true,
