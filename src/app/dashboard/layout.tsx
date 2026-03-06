@@ -221,26 +221,35 @@ function DashboardHeader({ onMenuClick }: { onMenuClick: () => void }) {
                 <button onClick={onMenuClick} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px', padding: '4px' }} id="mobile-menu-btn">
                     ☰
                 </button>
-                <div>
+                <div className="header-title-container">
                     <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>{getPageTitle()}</h2>
                 </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, justifyContent: 'flex-end', padding: '0 16px' }}>
+            <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, justifyContent: 'flex-end', padding: '0 16px' }}>
                 <button
                     onClick={() => setAiModalOpen(true)}
-                    className="btn btn-primary"
-                    style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', gap: '6px', padding: '8px 16px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                    className="btn btn-primary ai-btn"
+                    style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', gap: '6px', padding: '8px 16px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }}
                 >
-                    ✨ AI Assistant
+                    ✨ <span className="hide-mobile">AI Assistant</span>
                 </button>
                 {/* Global Student Search Bar */}
-                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-2)', padding: '6px 14px', borderRadius: '12px', border: '1px solid var(--border)', maxWidth: '300px', width: '100%', gap: '8px' }}>
+                <div
+                    className="search-input-container"
+                    style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-2)', padding: '6px 14px', borderRadius: '12px', border: '1px solid var(--border)', maxWidth: '300px', width: '100%', gap: '8px', cursor: 'pointer' }}
+                    onClick={() => {
+                        if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                            window.location.href = '/dashboard/students';
+                        }
+                    }}
+                >
                     <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>🔍</span>
                     <input
                         type="text"
-                        placeholder="Search student by name or mobile..."
-                        style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-primary)', fontSize: '13px', width: '100%' }}
+                        className="search-input"
+                        placeholder="Search student..."
+                        style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-primary)', fontSize: '13px', width: '100%', cursor: 'text' }}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                                 const val = e.currentTarget.value;
@@ -249,20 +258,21 @@ function DashboardHeader({ onMenuClick }: { onMenuClick: () => void }) {
                                 }
                             }
                         }}
+                        onClick={(e) => e.stopPropagation()}
                     />
                 </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div className="header-user-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="hide-mobile" style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', display: 'inline-block' }} />
                     Live
                 </div>
                 <Link href="/dashboard/leads" style={{ position: 'relative', textDecoration: 'none' }}>
-                    <div style={{ padding: '8px', background: 'var(--surface-2)', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '16px' }}>🔔</div>
+                    <div className="bell-icon" style={{ padding: '8px', background: 'var(--surface-2)', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '16px' }}>🔔</div>
                 </Link>
                 <Link href="/dashboard/profile">
-                    <div className="avatar">
+                    <div className="avatar header-avatar">
                         {tenant?.name?.charAt(0) || 'C'}
                     </div>
                 </Link>

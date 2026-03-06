@@ -805,3 +805,49 @@ tr:hover td {
 .pricing-card.featured:hover {
   transform: scale(1.05) translateY(-4px);
 }
+
+@media (max-width: 768px) {
+  .header-actions {
+    gap: 8px !important;
+    padding: 0 8px !important;
+  }
+
+  .ai-btn {
+    padding: 6px 10px !important;
+  }
+
+  .search-input-container {
+    width: auto !important;
+    max-width: none !important;
+    padding: 6px 10px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+  }
+
+  .search-input {
+    display: none !important;
+  }
+
+  .header-user-actions {
+    gap: 8px !important;
+  }
+
+  .bell-icon {
+    padding: 6px !important;
+    font-size: 14px !important;
+  }
+
+  .header-avatar {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 12px !important;
+  }
+
+  .header-title-container h2 {
+    font-size: 14px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+  }
+}
