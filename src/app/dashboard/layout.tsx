@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { hasFeature, NAV_FEATURE_MAP, PlanFeatures } from '@/lib/planLimits'
+import AIGeneratorModal from '@/components/AIGeneratorModal'
 
 const navItems = [
     {
@@ -183,6 +184,7 @@ function DashboardSidebar({ open, onClose }: { open: boolean; onClose: () => voi
 function DashboardHeader({ onMenuClick }: { onMenuClick: () => void }) {
     const pathname = usePathname()
     const { tenant } = useAuth()
+    const [aiModalOpen, setAiModalOpen] = useState(false)
 
     const getPageTitle = () => {
         const map: Record<string, string> = {
@@ -225,6 +227,13 @@ function DashboardHeader({ onMenuClick }: { onMenuClick: () => void }) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, justifyContent: 'flex-end', padding: '0 16px' }}>
+                <button
+                    onClick={() => setAiModalOpen(true)}
+                    className="btn btn-primary"
+                    style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', gap: '6px', padding: '8px 16px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                >
+                    ✨ AI Generator
+                </button>
                 {/* Global Student Search Bar */}
                 <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-2)', padding: '6px 14px', borderRadius: '12px', border: '1px solid var(--border)', maxWidth: '300px', width: '100%', gap: '8px' }}>
                     <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>🔍</span>
@@ -258,6 +267,8 @@ function DashboardHeader({ onMenuClick }: { onMenuClick: () => void }) {
                     </div>
                 </Link>
             </div>
+
+            <AIGeneratorModal isOpen={aiModalOpen} onClose={() => setAiModalOpen(false)} />
         </header>
     )
 }
