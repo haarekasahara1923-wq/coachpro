@@ -3,6 +3,13 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 
+const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div>
+        <label className="label">{label}</label>
+        {children}
+    </div>
+)
+
 export default function AddStudentPage() {
     const { token } = useAuth()
     const router = useRouter()
@@ -50,13 +57,6 @@ export default function AddStudentPage() {
             setToast(data.error || 'Failed to add student')
         }
     }
-
-    const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
-        <div>
-            <label className="label">{label}</label>
-            {children}
-        </div>
-    )
 
     return (
         <div>
