@@ -8,6 +8,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const { id } = await params
         const product = await prisma.gyankoshProduct.findUnique({
             where: { id, isActive: true },
+            include: { bonuses: true, orderBumps: true }
         })
 
         if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
