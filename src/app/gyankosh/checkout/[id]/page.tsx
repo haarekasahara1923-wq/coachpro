@@ -25,15 +25,26 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
         if (storedAffiliate) setFormData(prev => ({ ...prev, affiliateTenantId: storedAffiliate }))
 
         const fetchCheckoutData = async () => {
+            if (id === 'cart') {
+                try {
+                    const cartData = JSON.parse(localStorage.getItem('gyankosh_cart') || '[]')
+                    if (cartData.length === 0) { window.location.href = '/gyankosh'; return }
+                    setBumps(cartData) // Reusing bumps state for cart items list
+                    setLoading(false)
+                } catch (e) { window.location.href = '/gyankosh' }
+                return
+            }
+
             try {
                 const res = await fetch(`/api/marketplace/products/${id}`)
                 const data = await res.json()
                 if (!data.error) {
                     setProduct(data)
-                    // If there are bumps in URL, filter from product.orderBumps
                     if (data.orderBumps) {
                         const selectedBumps = data.orderBumps.filter((b: any) => bumpIds.includes(b.id))
-                        setBumps(selectedBumps)
+                        setBumps([{ ...data, bumps: selectedBumps, productId: id }]) 
+                    } else {
+                        setBumps([{ ...data, bumps: [], productId: id }])
                     }
                 }
                 setLoading(false)
@@ -44,9 +55,15 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
     }, [id])
 
     const calculateTotal = () => {
+        if (id === 'cart') {
+            return bumps.reduce((total, item) => {
+                const itemTotal = item.price + (item.bumps || []).reduce((s: number, b: any) => s + b.discountedPrice, 0)
+                return total + itemTotal
+            }, 0)
+        }
         if (!product) return 0
         const mainPrice = product.price - (product.price * (product.discount / 100))
-        const bumpsPrice = bumps.reduce((sum, b) => sum + b.discountedPrice, 0)
+        const bumpsPrice = (bumps[0]?.bumps || []).reduce((sum: number, b: any) => sum + b.discountedPrice, 0)
         return mainPrice + bumpsPrice
     }
 
@@ -56,11 +73,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
         }
         setProcessing(true)
         try {
+            const orderItems = id === 'cart' 
+                ? bumps.map(item => ({ productId: item.productId, orderBumpIds: (item.bumps || []).map((b: any) => b.id) }))
+                : [{ productId: id, orderBumpIds: (bumps[0]?.bumps || []).map((b: any) => b.id) }]
+
             const orderRes = await fetch('/api/marketplace/create-order', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    productId: id, 
-                    orderBumpIds: bumps.map(b => b.id),
+                    items: orderItems,
                     ...formData 
                 })
             })
@@ -70,7 +90,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
             const options = {
                 key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
                 amount: orderData.amount, currency: orderData.currency,
-                name: 'Gyankosh Marketplace', description: product.title,
+                name: 'Gyankosh Marketplace', 
+                description: id === 'cart' ? `Cart Purchase (${orderItems.length} items)` : product.title,
                 order_id: orderData.orderId,
                 handler: async function (response: any) {
                     const verifyRes = await fetch('/api/marketplace/verify-order', {
@@ -85,7 +106,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                     const verifyData = await verifyRes.json()
                     if (verifyData.success) {
                         setSuccess(true)
-                        setDownloadLink(verifyData.downloadLink || product.fileUrl || '')
+                        if (id === 'cart') localStorage.removeItem('gyankosh_cart')
+                        setDownloadLink(verifyData.downloadLink || '')
                     } else { alert('Payment verification failed.') }
                 },
                 prefill: { name: formData.studentName, email: formData.email, contact: formData.phone },
@@ -101,15 +123,15 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
     }
 
     if (loading) return <div style={{ color: 'white', textAlign: 'center', marginTop: '100px' }}>Loading...</div>
-    if (!product) return <div style={{ color: 'white', textAlign: 'center', marginTop: '100px' }}>Product not found.</div>
+    if (!product && id !== 'cart') return <div style={{ color: 'white', textAlign: 'center', marginTop: '100px' }}>Product not found.</div>
 
     const totalAmount = calculateTotal()
 
     return (
         <div style={{ minHeight: '100vh', background: 'var(--bg-color, #0f0f1a)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
             <div style={{ background: 'var(--surface, #1e1e2e)', borderRadius: '16px', padding: '32px', maxWidth: '500px', width: '100%', border: '1px solid var(--border)' }}>
-                <Link href="/gyankosh" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px', marginBottom: '24px', display: 'inline-block' }}>
-                    ← Back to Gyankosh
+                <Link href={id === 'cart' ? "/gyankosh/cart" : "/gyankosh"} style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px', marginBottom: '24px', display: 'inline-block' }}>
+                    ← Back to {id === 'cart' ? 'Cart' : 'Gyankosh'}
                 </Link>
 
                 {success ? (
@@ -117,30 +139,47 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
                         <h2 style={{ color: 'white', marginBottom: '12px' }}>Payment Successful!</h2>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>Your products are ready for download.</p>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '16px' }}>📧 Download links for main product, bonuses and added bumps have been sent to your email.</p>
-                        {downloadLink ? (
-                            <a href={downloadLink} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', background: '#10b981', color: 'white', padding: '14px 28px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '16px' }}>
-                                📥 Download Main Product
-                            </a>
-                        ) : (
-                            <p style={{ color: 'var(--text-muted)' }}>Material will be sent to your email shortly.</p>
-                        )}
+                        <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px' }}>📧 Download links for all products, bonuses and added bumps have been sent to your email.</p>
+                        
+                        <Link href="/gyankosh" style={{ display: 'inline-block', background: '#10b981', color: 'white', padding: '14px 28px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold' }}>
+                            Continue Shopping
+                        </Link>
                     </div>
                 ) : (
                     <>
                         <h2 style={{ color: 'white', marginBottom: '8px', fontSize: '24px' }}>Checkout</h2>
                         
                         <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>{product.title}</span>
-                                <span style={{ color: 'white', fontWeight: 'bold' }}>₹{product.price - (product.price * (product.discount / 100))}</span>
-                            </div>
-                            {bumps.map(b => (
-                                <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                                    <span style={{ color: '#10b981' }}>+ {b.title}</span>
-                                    <span style={{ color: 'white' }}>₹{b.discountedPrice}</span>
-                                </div>
-                            ))}
+                            {id === 'cart' ? (
+                                bumps.map((item, i) => (
+                                    <div key={i} style={{ marginBottom: i < bumps.length - 1 ? '16px' : '0' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                            <span style={{ color: 'white', fontWeight: '600', fontSize: '14px' }}>{item.title}</span>
+                                            <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>₹{item.price}</span>
+                                        </div>
+                                        {(item.bumps || []).map((b: any, bi: number) => (
+                                            <div key={bi} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#10b981', paddingLeft: '12px' }}>
+                                                <span>+ {b.title}</span>
+                                                <span>₹{b.discountedPrice}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ))
+                            ) : (
+                                <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)' }}>{product.title}</span>
+                                        <span style={{ color: 'white', fontWeight: 'bold' }}>₹{product.price - (product.price * (product.discount / 100))}</span>
+                                    </div>
+                                    {(bumps[0]?.bumps || []).map((b: any, bi: number) => (
+                                        <div key={bi} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                                            <span style={{ color: '#10b981' }}>+ {b.title}</span>
+                                            <span style={{ color: 'white' }}>₹{b.discountedPrice}</span>
+                                        </div>
+                                    ))}
+                                </>
+                            )}
+                            
                             <div style={{ borderTop: '1px solid var(--border)', marginTop: '12px', paddingTop: '12px', display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: 'white', fontWeight: 'bold' }}>Total Amount:</span>
                                 <span style={{ color: '#10b981', fontWeight: '900', fontSize: '20px' }}>₹{totalAmount}</span>

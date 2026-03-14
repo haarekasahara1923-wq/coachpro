@@ -9,32 +9,47 @@ const razorpay = new Razorpay({
 
 export async function POST(req: Request) {
     try {
-        const { productId, studentName, email, phone, affiliateTenantId, orderBumpIds } = await req.json()
+        const { items, studentName, email, phone, affiliateTenantId } = await req.json()
 
-        // Retrieve Product
-        const product = await prisma.gyankoshProduct.findUnique({
-            where: { id: productId },
-            include: { orderBumps: true }
-        })
-
-        if (!product || !product.isActive) {
-            return NextResponse.json({ error: 'Product not found or inactive' }, { status: 404 })
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return NextResponse.json({ error: 'No items in order' }, { status: 400 })
         }
 
-        const mainPrice = product.price - (product.price * (product.discount / 100))
-        
-        // Calculate total for bumps
-        let bumpsTotal = 0
-        const actualBumpIds: string[] = []
-        
-        if (orderBumpIds && orderBumpIds.length > 0) {
-            const selectedBumps = product.orderBumps.filter(b => orderBumpIds.includes(b.id))
-            bumpsTotal = selectedBumps.reduce((sum, b) => sum + b.discountedPrice, 0)
-            selectedBumps.forEach(b => actualBumpIds.push(b.id))
+        let totalAmount = 0
+        const dbItems: any[] = []
+
+        // Fetch each product and calculate prices
+        for (const item of items) {
+            const product = await prisma.gyankoshProduct.findUnique({
+                where: { id: item.productId },
+                include: { orderBumps: true }
+            })
+
+            if (!product || !product.isActive) continue
+
+            const mainPrice = product.price - (product.price * (product.discount / 100))
+            let bumpsPrice = 0
+            const selectedBumpIds: string[] = []
+
+            if (item.orderBumpIds && item.orderBumpIds.length > 0) {
+                const selectedBumps = product.orderBumps.filter(b => item.orderBumpIds.includes(b.id))
+                bumpsPrice = selectedBumps.reduce((sum, b) => sum + b.discountedPrice, 0)
+                selectedBumps.forEach(b => selectedBumpIds.push(b.id))
+            }
+
+            totalAmount += (mainPrice + bumpsPrice)
+            dbItems.push({
+                productId: product.id,
+                orderBumpIds: selectedBumpIds,
+                amount: mainPrice + bumpsPrice
+            })
         }
 
-        const finalTotal = mainPrice + bumpsTotal
-        const amountInPaise = Math.round(finalTotal * 100)
+        if (dbItems.length === 0) {
+            return NextResponse.json({ error: 'No valid products found' }, { status: 404 })
+        }
+
+        const amountInPaise = Math.round(totalAmount * 100)
 
         // Verify affiliate
         let validAffiliateId = null
@@ -45,14 +60,13 @@ export async function POST(req: Request) {
             if (coaching) validAffiliateId = coaching.id
         }
 
-        // Commission (20%)
-        const commissionAmount = validAffiliateId ? (finalTotal * 0.20) : 0
+        const commissionAmount = validAffiliateId ? (totalAmount * 0.20) : 0
 
         // Create Razorpay Order
         const options = {
             amount: amountInPaise,
             currency: 'INR',
-            receipt: `gyankosh_${Date.now()}`,
+            receipt: `gyankosh_cart_${Date.now()}`,
         }
 
         const rzpOrder = await razorpay.orders.create(options)
@@ -60,12 +74,11 @@ export async function POST(req: Request) {
         // Create record in DB
         const order = await prisma.gyankoshOrder.create({
             data: {
-                productId,
-                orderBumpIds: actualBumpIds,
+                items: dbItems,
                 studentName,
                 email,
                 phone,
-                amount: finalTotal,
+                amount: totalAmount,
                 status: 'PENDING',
                 razorpayOrderId: rzpOrder.id,
                 affiliateTenantId: validAffiliateId,
@@ -81,7 +94,7 @@ export async function POST(req: Request) {
         })
 
     } catch (error: any) {
-        console.error('Error creating marketplace order:', error)
+        console.error('Error creating cart order:', error)
         return NextResponse.json({ error: error.message || 'Failed to create order' }, { status: 500 })
     }
 }

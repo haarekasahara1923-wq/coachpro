@@ -1,10 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { ShoppingCart } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [cartCount, setCartCount] = useState(0)
+
+  const updateCartCount = () => {
+    try {
+      const cart = JSON.parse(localStorage.getItem('gyankosh_cart') || '[]')
+      setCartCount(cart.length)
+    } catch (e) { setCartCount(0) }
+  }
+
+  useEffect(() => {
+    updateCartCount()
+    window.addEventListener('gyankosh_cart_updated', updateCartCount)
+    return () => window.removeEventListener('gyankosh_cart_updated', updateCartCount)
+  }, [])
 
   return (
     <nav style={{
@@ -28,21 +43,35 @@ export default function Navbar() {
         <Link href="/gyankosh" style={{ color: '#10b981', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}>Gyankosh</Link>
       </div>
 
-      <div className="hide-mobile" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <Link href="/login" style={{ color: 'white', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>Login</Link>
-        <Link href="/register" style={{ 
-          padding: '8px 18px', fontSize: '13px', background: 'var(--primary)', 
-          color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', textDecoration: 'none' 
-        }}>Join Now 🚀</Link>
-      </div>
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+        <Link href="/gyankosh/cart" style={{ position: 'relative', color: 'white', display: 'flex', alignItems: 'center' }}>
+          <ShoppingCart size={22} />
+          {cartCount > 0 && (
+            <span style={{
+              position: 'absolute', top: '-10px', right: '-10px',
+              background: '#ef4444', color: 'white', fontSize: '10px',
+              width: '18px', height: '18px', borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold'
+            }}>{cartCount}</span>
+          )}
+        </Link>
 
-      <div className="show-mobile" style={{ display: 'none', alignItems: 'center' }}>
-        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} style={{ 
-            background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', 
-            color: 'white', padding: '8px', borderRadius: '8px', cursor: 'pointer' 
-        }}>
-          {mobileMenuOpen ? '✕' : '☰'}
-        </button>
+        <div className="hide-mobile" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <Link href="/login" style={{ color: 'white', textDecoration: 'none', fontSize: '14px', fontWeight: '600' }}>Login</Link>
+          <Link href="/register" style={{ 
+            padding: '8px 18px', fontSize: '13px', background: 'var(--primary)', 
+            color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', textDecoration: 'none' 
+          }}>Join Now 🚀</Link>
+        </div>
+
+        <div className="show-mobile" style={{ display: 'none', alignItems: 'center' }}>
+          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} style={{ 
+              background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', 
+              color: 'white', padding: '8px', borderRadius: '8px', cursor: 'pointer' 
+          }}>
+            {mobileMenuOpen ? '✕' : '☰'}
+          </button>
+        </div>
       </div>
 
       {mobileMenuOpen && (

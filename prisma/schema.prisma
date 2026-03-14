@@ -680,8 +680,9 @@ model GyankoshOrderBump {
 
 model GyankoshOrder {
   id                String   @id @default(cuid())
-  productId         String
-  orderBumpIds      String[] // IDs of selected order bumps
+  productId         String?  // Keep for legacy/single product reference, but make optional
+  items             Json?    // Array of { productId, orderBumpIds }
+  orderBumpIds      String[] // Keep for legacy, but items will be primary
   studentName       String
   email             String
   phone             String
@@ -690,11 +691,11 @@ model GyankoshOrder {
   razorpayOrderId   String?
   razorpayPaymentId String?
   affiliateTenantId String? 
-  commissionAmount  Float    @default(0) // Track how much commission was given
+  commissionAmount  Float    @default(0)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  product         GyankoshProduct @relation(fields: [productId], references: [id])
+  product         GyankoshProduct? @relation(fields: [productId], references: [id])
   tenant          Tenant?         @relation("TenantAffiliateOrders", fields: [affiliateTenantId], references: [id])
   globalAffiliateCommission AffiliateMarketplaceCommission?
 }

@@ -27,19 +27,46 @@ export default function GyankoshMarketplace() {
         } catch (error) { console.error(error); setLoading(false) }
     }
 
+    const addToCart = (product: any, bumpIds: string[] = []) => {
+        try {
+            const currentCart = JSON.parse(localStorage.getItem('gyankosh_cart') || '[]')
+            
+            // Check if product already exists with same bumps, or just update it
+            const existingIndex = currentCart.findIndex((item: any) => item.productId === product.id)
+            if (existingIndex > -1) {
+                currentCart[existingIndex].orderBumpIds = bumpIds
+            } else {
+                currentCart.push({ 
+                    productId: product.id, 
+                    orderBumpIds: bumpIds,
+                    title: product.title,
+                    price: product.price - (product.price * (product.discount / 100)),
+                    imageUrl: product.imageUrl,
+                    bumps: product.orderBumps?.filter((b: any) => bumpIds.includes(b.id)) 
+                })
+            }
+            
+            localStorage.setItem('gyankosh_cart', JSON.stringify(currentCart))
+            window.dispatchEvent(new Event('gyankosh_cart_updated'))
+            alert(`${product.title} added to cart!`)
+            setShowBumpModal(false)
+        } catch (e) { console.error(e) }
+    }
+
     const handleBuyNow = (product: any) => {
         if (product.orderBumps && product.orderBumps.length > 0) {
             setSelectedProduct(product)
             setSelectedBumps([])
             setShowBumpModal(true)
         } else {
-            window.location.href = `/gyankosh/checkout/${product.id}`
+            addToCart(product)
+            window.location.href = '/gyankosh/cart'
         }
     }
 
     const proceedToCheckout = () => {
-        const bumpsParam = selectedBumps.length > 0 ? `?b=${selectedBumps.join(',')}` : ''
-        window.location.href = `/gyankosh/checkout/${selectedProduct.id}${bumpsParam}`
+        addToCart(selectedProduct, selectedBumps)
+        window.location.href = '/gyankosh/cart'
     }
 
     const filteredProducts = products.filter(p =>
@@ -132,19 +159,31 @@ export default function GyankoshMarketplace() {
                                             {product.description}
                                         </p>
 
-                                        <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <div>
-                                                {product.discount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-muted)', textDecoration: 'line-through', marginRight: '8px' }}>₹{product.price}</span>}
-                                                <span style={{ fontSize: '20px', fontWeight: '800', color: '#10b981' }}>₹{finalPrice}</span>
+                                        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <div>
+                                                    {product.discount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-muted)', textDecoration: 'line-through', marginRight: '8px' }}>₹{product.price}</span>}
+                                                    <span style={{ fontSize: '20px', fontWeight: '800', color: '#10b981' }}>₹{finalPrice}</span>
+                                                </div>
                                             </div>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleBuyNow(product); }}
-                                                style={{
-                                                    background: '#10b981', color: 'white', border: 'none', padding: '8px 16px',
-                                                    borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer'
-                                                }}>
-                                                Buy Now
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                                                    style={{
+                                                        flex: 1, background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid var(--border)', 
+                                                        padding: '10px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '12px'
+                                                    }}>
+                                                    Add to Cart
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleBuyNow(product); }}
+                                                    style={{
+                                                        flex: 1, background: '#10b981', color: 'white', border: 'none', 
+                                                        padding: '10px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px'
+                                                    }}>
+                                                    Buy Now
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </motion.div>

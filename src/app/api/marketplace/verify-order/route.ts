@@ -28,20 +28,12 @@ export async function POST(req: Request) {
             data: {
                 status: 'SUCCESS',
                 razorpayPaymentId: razorpay_payment_id
-            },
-            include: { 
-                product: {
-                    include: {
-                        bonuses: true,
-                        orderBumps: true
-                    }
-                } 
             }
         })
 
         // Process affiliate commission
         if (order.affiliateTenantId && order.commissionAmount > 0) {
-            const tenantObj = await prisma.tenant.update({
+            await prisma.tenant.update({
                 where: { id: order.affiliateTenantId },
                 data: {
                     totalEarnings: { increment: order.commissionAmount },
@@ -50,36 +42,47 @@ export async function POST(req: Request) {
             });
         }
 
-        // Prepare email table
-        const mainProduct = order.product
-        const selectedBumpIds = order.orderBumpIds || []
-        const selectedBumps = mainProduct?.orderBumps.filter(b => selectedBumpIds.includes(b.id)) || []
-        const bonuses = mainProduct?.bonuses || []
+        // Prepare email table for all items
+        const orderItems = (order.items as any[]) || []
+        let itemsHtml = ''
 
-        let itemsHtml = `
-            <tr>
-                <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>${mainProduct?.title} (Main)</strong></td>
-                <td style="padding: 12px; border: 1px solid #e5e7eb;"><a href="${mainProduct?.fileUrl}" style="color: #4f46e5; font-weight: bold;">Download Link</a></td>
-            </tr>
-        `
+        for (const item of orderItems) {
+            const product = await prisma.gyankoshProduct.findUnique({
+                where: { id: item.productId },
+                include: { bonuses: true, orderBumps: true }
+            })
+            if (!product) continue
 
-        bonuses.forEach(b => {
+            // Main Product
             itemsHtml += `
-                <tr style="background-color: #f0fdf4;">
-                    <td style="padding: 12px; border: 1px solid #e5e7eb;">🎁 ${b.title} (FREE Bonus)</td>
-                    <td style="padding: 12px; border: 1px solid #e5e7eb;"><a href="${b.fileUrl}" style="color: #10b981; font-weight: bold;">Download Link</a></td>
+                <tr>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>${product.title} (Main)</strong></td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;"><a href="${product.fileUrl}" style="color: #4f46e5; font-weight: bold;">Download Link</a></td>
                 </tr>
             `
-        })
 
-        selectedBumps.forEach(b => {
-            itemsHtml += `
-                <tr style="background-color: #f5f3ff;">
-                    <td style="padding: 12px; border: 1px solid #e5e7eb;">🚀 ${b.title} (Bump Product)</td>
-                    <td style="padding: 12px; border: 1px solid #e5e7eb;"><a href="${b.fileUrl}" style="color: #6366f1; font-weight: bold;">Download Link</a></td>
-                </tr>
-            `
-        })
+            // Bonuses
+            product.bonuses.forEach(b => {
+                itemsHtml += `
+                    <tr style="background-color: #f0fdf4;">
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">🎁 ${b.title} (FREE Bonus)</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;"><a href="${b.fileUrl}" style="color: #10b981; font-weight: bold;">Download Link</a></td>
+                    </tr>
+                `
+            })
+
+            // Selected Bumps
+            const selectedBumpIds = item.orderBumpIds || []
+            const selectedBumps = product.orderBumps.filter(b => selectedBumpIds.includes(b.id))
+            selectedBumps.forEach(b => {
+                itemsHtml += `
+                    <tr style="background-color: #f5f3ff;">
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">🚀 ${b.title} (Bump Product)</td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;"><a href="${b.fileUrl}" style="color: #6366f1; font-weight: bold;">Download Link</a></td>
+                    </tr>
+                `
+            })
+        }
 
         if (order.email) {
             try {
@@ -93,12 +96,12 @@ export async function POST(req: Request) {
                 await transporter.sendMail({
                     from: process.env.EMAIL_FROM || '"CoachPro Gyankosh" <noreply@coachpro.in>',
                     to: order.email,
-                    subject: `Your Purchase Details: ${mainProduct?.title}`,
+                    subject: `Your Purchase Details - ${orderItems.length} Products`,
                     html: `
                         <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto;">
                             <h2 style="color: #4f46e5; text-align: center;">Payment Successful! 🎉</h2>
                             <p>Hello <strong>${order.studentName || 'Student'}</strong>,</p>
-                            <p>Thank you for your purchase from Gyankosh. Here are your access links:</p>
+                            <p>Thank you for your purchase from Gyankosh. Here are the access links for all your items:</p>
                             
                             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                                 <thead>
@@ -117,7 +120,7 @@ export async function POST(req: Request) {
                                 <p style="margin: 5px 0 0 0; font-size: 12px; color: #6b7280;"><strong>Order ID:</strong> ${order.id}</p>
                             </div>
 
-                            <p style="font-size: 14px; color: #6b7280;">Links are linked to Google Drive. Please ensure you are logged into your Google account if the link is restricted, or it may be public for direct access.</p>
+                            <p style="font-size: 14px; color: #6b7280;">Links are linked to Google Drive. Please ensure you are logged into your Google account to access them.</p>
                             
                             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
                             <p style="font-size: 12px; color: #9ca3af; text-align: center;">Best regards,<br>CoachPro Gyankosh Team</p>
@@ -127,7 +130,7 @@ export async function POST(req: Request) {
             } catch (err) { console.error('Email error:', err) }
         }
 
-        return NextResponse.json({ success: true, downloadLink: mainProduct?.fileUrl })
+        return NextResponse.json({ success: true })
     } catch (error: any) {
         console.error('Verify error:', error)
         return NextResponse.json({ error: 'Verification failed' }, { status: 500 })
