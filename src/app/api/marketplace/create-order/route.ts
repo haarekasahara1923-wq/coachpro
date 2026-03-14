@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import Razorpay from 'razorpay'
 
-
-
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || '',
     key_secret: process.env.RAZORPAY_KEY_SECRET || '',
@@ -11,33 +9,44 @@ const razorpay = new Razorpay({
 
 export async function POST(req: Request) {
     try {
-        const { productId, studentName, email, phone, affiliateTenantId } = await req.json()
+        const { productId, studentName, email, phone, affiliateTenantId, orderBumpIds } = await req.json()
 
-        // Retrieve Product to calculate correct amount
+        // Retrieve Product
         const product = await prisma.gyankoshProduct.findUnique({
-            where: { id: productId }
+            where: { id: productId },
+            include: { orderBumps: true }
         })
 
         if (!product || !product.isActive) {
             return NextResponse.json({ error: 'Product not found or inactive' }, { status: 404 })
         }
 
-        const finalPrice = product.price - (product.price * (product.discount / 100))
-        const amountInPaise = Math.round(finalPrice * 100)
+        const mainPrice = product.price - (product.price * (product.discount / 100))
+        
+        // Calculate total for bumps
+        let bumpsTotal = 0
+        const actualBumpIds: string[] = []
+        
+        if (orderBumpIds && orderBumpIds.length > 0) {
+            const selectedBumps = product.orderBumps.filter(b => orderBumpIds.includes(b.id))
+            bumpsTotal = selectedBumps.reduce((sum, b) => sum + b.discountedPrice, 0)
+            selectedBumps.forEach(b => actualBumpIds.push(b.id))
+        }
 
-        // Verify affiliate (optional)
+        const finalTotal = mainPrice + bumpsTotal
+        const amountInPaise = Math.round(finalTotal * 100)
+
+        // Verify affiliate
         let validAffiliateId = null
         if (affiliateTenantId) {
             const coaching = await prisma.tenant.findUnique({
                 where: { id: affiliateTenantId }
             })
-            if (coaching) {
-                validAffiliateId = coaching.id
-            }
+            if (coaching) validAffiliateId = coaching.id
         }
 
-        // Commission logic (20% of finalPrice)
-        const commissionAmount = validAffiliateId ? (finalPrice * 0.20) : 0
+        // Commission (20%)
+        const commissionAmount = validAffiliateId ? (finalTotal * 0.20) : 0
 
         // Create Razorpay Order
         const options = {
@@ -52,10 +61,11 @@ export async function POST(req: Request) {
         const order = await prisma.gyankoshOrder.create({
             data: {
                 productId,
+                orderBumpIds: actualBumpIds,
                 studentName,
                 email,
                 phone,
-                amount: finalPrice,
+                amount: finalTotal,
                 status: 'PENDING',
                 razorpayOrderId: rzpOrder.id,
                 affiliateTenantId: validAffiliateId,

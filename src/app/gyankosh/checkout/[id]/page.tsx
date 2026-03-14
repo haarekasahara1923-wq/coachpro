@@ -2,10 +2,16 @@
 
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 
 export default function CheckoutPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
+    const searchParams = useSearchParams()
+    const bumpIdsStr = searchParams.get('b')
+    const bumpIds = bumpIdsStr ? bumpIdsStr.split(',') : []
+
     const [product, setProduct] = useState<any>(null)
+    const [bumps, setBumps] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [formData, setFormData] = useState({
         studentName: '', email: '', phone: '', affiliateTenantId: '',
@@ -18,11 +24,31 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
         const storedAffiliate = localStorage.getItem('gyankosh_affiliate_id')
         if (storedAffiliate) setFormData(prev => ({ ...prev, affiliateTenantId: storedAffiliate }))
 
-        fetch(`/api/marketplace/products/${id}`)
-            .then(res => res.json())
-            .then(data => { if (!data.error) setProduct(data); setLoading(false) })
-            .catch(() => setLoading(false))
+        const fetchCheckoutData = async () => {
+            try {
+                const res = await fetch(`/api/marketplace/products/${id}`)
+                const data = await res.json()
+                if (!data.error) {
+                    setProduct(data)
+                    // If there are bumps in URL, filter from product.orderBumps
+                    if (data.orderBumps) {
+                        const selectedBumps = data.orderBumps.filter((b: any) => bumpIds.includes(b.id))
+                        setBumps(selectedBumps)
+                    }
+                }
+                setLoading(false)
+            } catch (error) { console.error(error); setLoading(false) }
+        }
+
+        fetchCheckoutData()
     }, [id])
+
+    const calculateTotal = () => {
+        if (!product) return 0
+        const mainPrice = product.price - (product.price * (product.discount / 100))
+        const bumpsPrice = bumps.reduce((sum, b) => sum + b.discountedPrice, 0)
+        return mainPrice + bumpsPrice
+    }
 
     const handlePayment = async () => {
         if (!formData.studentName || !formData.email || !formData.phone) {
@@ -32,7 +58,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
         try {
             const orderRes = await fetch('/api/marketplace/create-order', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productId: id, ...formData })
+                body: JSON.stringify({ 
+                    productId: id, 
+                    orderBumpIds: bumps.map(b => b.id),
+                    ...formData 
+                })
             })
             const orderData = await orderRes.json()
             if (orderData.error) { alert('Error: ' + orderData.error); setProcessing(false); return }
@@ -73,7 +103,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
     if (loading) return <div style={{ color: 'white', textAlign: 'center', marginTop: '100px' }}>Loading...</div>
     if (!product) return <div style={{ color: 'white', textAlign: 'center', marginTop: '100px' }}>Product not found.</div>
 
-    const finalPrice = product.price - (product.price * (product.discount / 100))
+    const totalAmount = calculateTotal()
 
     return (
         <div style={{ minHeight: '100vh', background: 'var(--bg-color, #0f0f1a)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -86,11 +116,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                     <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
                         <h2 style={{ color: 'white', marginBottom: '12px' }}>Payment Successful!</h2>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>Thank you for purchasing {product.title}.</p>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '16px' }}>📧 The download link has also been sent to your email & WhatsApp.</p>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>Your products are ready for download.</p>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '16px' }}>📧 Download links for main product, bonuses and added bumps have been sent to your email.</p>
                         {downloadLink ? (
                             <a href={downloadLink} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', background: '#10b981', color: 'white', padding: '14px 28px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '16px' }}>
-                                📥 Download Your Product
+                                📥 Download Main Product
                             </a>
                         ) : (
                             <p style={{ color: 'var(--text-muted)' }}>Material will be sent to your email shortly.</p>
@@ -99,14 +129,21 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                 ) : (
                     <>
                         <h2 style={{ color: 'white', marginBottom: '8px', fontSize: '24px' }}>Checkout</h2>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '24px' }}>
-                            <div>
-                                <h3 style={{ color: 'white', fontSize: '16px' }}>{product.title}</h3>
-                                <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>{product.category}</p>
+                        
+                        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>{product.title}</span>
+                                <span style={{ color: 'white', fontWeight: 'bold' }}>₹{product.price - (product.price * (product.discount / 100))}</span>
                             </div>
-                            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
-                                {product.discount > 0 && <div style={{ fontSize: '14px', color: 'var(--text-muted)', textDecoration: 'line-through' }}>₹{product.price}</div>}
-                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>₹{finalPrice}</div>
+                            {bumps.map(b => (
+                                <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                                    <span style={{ color: '#10b981' }}>+ {b.title}</span>
+                                    <span style={{ color: 'white' }}>₹{b.discountedPrice}</span>
+                                </div>
+                            ))}
+                            <div style={{ borderTop: '1px solid var(--border)', marginTop: '12px', paddingTop: '12px', display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'white', fontWeight: 'bold' }}>Total Amount:</span>
+                                <span style={{ color: '#10b981', fontWeight: '900', fontSize: '20px' }}>₹{totalAmount}</span>
                             </div>
                         </div>
 
@@ -133,7 +170,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                                 color: 'white', border: 'none', padding: '14px', borderRadius: '8px',
                                 fontSize: '16px', fontWeight: 'bold', cursor: processing ? 'not-allowed' : 'pointer', marginTop: '16px'
                             }}>
-                                {processing ? 'Processing...' : `Pay ₹${finalPrice}`}
+                                {processing ? 'Processing...' : `Pay ₹${totalAmount}`}
                             </button>
                         </div>
                     </>

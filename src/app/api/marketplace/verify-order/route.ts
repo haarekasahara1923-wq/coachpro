@@ -7,7 +7,6 @@ export async function POST(req: Request) {
     try {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature, dbOrderId } = await req.json()
 
-        // Verify signature
         const body = razorpay_order_id + "|" + razorpay_payment_id
         const expectedSignature = crypto
             .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
@@ -24,14 +23,20 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 })
         }
 
-        // Mark Order as SUCCESS
         const order = await prisma.gyankoshOrder.update({
             where: { id: dbOrderId },
             data: {
                 status: 'SUCCESS',
                 razorpayPaymentId: razorpay_payment_id
             },
-            include: { product: true }
+            include: { 
+                product: {
+                    include: {
+                        bonuses: true,
+                        orderBumps: true
+                    }
+                } 
+            }
         })
 
         // Process affiliate commission
@@ -41,99 +46,90 @@ export async function POST(req: Request) {
                 data: {
                     totalEarnings: { increment: order.commissionAmount },
                     availableBalance: { increment: order.commissionAmount }
-                },
-                select: { affiliateId: true, id: true }
+                }
             });
-
-            if (tenantObj.affiliateId) {
-                const now = new Date();
-                const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                await prisma.affiliateMarketplaceCommission.upsert({
-                    where: { orderId: dbOrderId },
-                    update: {},
-                    create: {
-                        affiliateId: tenantObj.affiliateId,
-                        tenantId: tenantObj.id,
-                        orderId: dbOrderId,
-                        orderAmount: order.amount,
-                        commissionPercentage: 20,
-                        commissionAmount: order.amount * 0.20,
-                        month: monthStr,
-                        status: 'PENDING'
-                    }
-                });
-            }
         }
 
-        // Send Google Drive link to buyer via email
-        const downloadLink = order.product?.fileUrl
-        if (downloadLink && order.email) {
+        // Prepare email table
+        const mainProduct = order.product
+        const selectedBumpIds = order.orderBumpIds || []
+        const selectedBumps = mainProduct?.orderBumps.filter(b => selectedBumpIds.includes(b.id)) || []
+        const bonuses = mainProduct?.bonuses || []
+
+        let itemsHtml = `
+            <tr>
+                <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>${mainProduct?.title} (Main)</strong></td>
+                <td style="padding: 12px; border: 1px solid #e5e7eb;"><a href="${mainProduct?.fileUrl}" style="color: #4f46e5; font-weight: bold;">Download Link</a></td>
+            </tr>
+        `
+
+        bonuses.forEach(b => {
+            itemsHtml += `
+                <tr style="background-color: #f0fdf4;">
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">🎁 ${b.title} (FREE Bonus)</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;"><a href="${b.fileUrl}" style="color: #10b981; font-weight: bold;">Download Link</a></td>
+                </tr>
+            `
+        })
+
+        selectedBumps.forEach(b => {
+            itemsHtml += `
+                <tr style="background-color: #f5f3ff;">
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">🚀 ${b.title} (Bump Product)</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;"><a href="${b.fileUrl}" style="color: #6366f1; font-weight: bold;">Download Link</a></td>
+                </tr>
+            `
+        })
+
+        if (order.email) {
             try {
-                // Setup Nodemailer transporter using environment variables
                 const transporter = nodemailer.createTransport({
                     host: process.env.SMTP_HOST,
                     port: Number(process.env.SMTP_PORT) || 587,
-                    secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for other ports
-                    auth: {
-                        user: process.env.SMTP_USER,
-                        pass: process.env.SMTP_PASS,
-                    },
+                    secure: Number(process.env.SMTP_PORT) === 465,
+                    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
                 });
 
-                // Send email
                 await transporter.sendMail({
                     from: process.env.EMAIL_FROM || '"CoachPro Gyankosh" <noreply@coachpro.in>',
                     to: order.email,
-                    subject: `Your Purchase Details: ${order.product?.title}`,
+                    subject: `Your Purchase Details: ${mainProduct?.title}`,
                     html: `
-                        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                            <h2 style="color: #4f46e5;">Thank you for your purchase!</h2>
+                        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto;">
+                            <h2 style="color: #4f46e5; text-align: center;">Payment Successful! 🎉</h2>
                             <p>Hello <strong>${order.studentName || 'Student'}</strong>,</p>
-                            <p>We have successfully received your payment for <strong>"${order.product?.title}"</strong>.</p>
+                            <p>Thank you for your purchase from Gyankosh. Here are your access links:</p>
                             
-                            <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                                <p style="margin: 0; font-size: 16px;"><strong>Amount Paid:</strong> ₹${order.amount}</p>
-                                <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;"><strong>Order ID:</strong> ${order.id}</p>
+                            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                                <thead>
+                                    <tr style="background-color: #f3f4f6;">
+                                        <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left;">Product</th>
+                                        <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left;">Access Link</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${itemsHtml}
+                                </tbody>
+                            </table>
+
+                            <div style="background-color: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb;">
+                                <p style="margin: 0;"><strong>Total Paid:</strong> ₹${order.amount}</p>
+                                <p style="margin: 5px 0 0 0; font-size: 12px; color: #6b7280;"><strong>Order ID:</strong> ${order.id}</p>
                             </div>
 
-                            <p>You can access your product using the button below:</p>
+                            <p style="font-size: 14px; color: #6b7280;">Links are linked to Google Drive. Please ensure you are logged into your Google account if the link is restricted, or it may be public for direct access.</p>
                             
-                            <a href="${downloadLink}" style="display: inline-block; padding: 12px 24px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-bottom: 20px;">
-                                Download / Access Product
-                            </a>
-
-                            <p style="font-size: 14px; color: #666;">If the button doesn't work, copy and paste this link into your browser:</p>
-                            <p style="font-size: 14px; color: #4f46e5; word-break: break-all;">${downloadLink}</p>
-
                             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
-                            <p style="font-size: 12px; color: #9ca3af;">Best regards,<br>CoachPro Gyankosh Team</p>
+                            <p style="font-size: 12px; color: #9ca3af; text-align: center;">Best regards,<br>CoachPro Gyankosh Team</p>
                         </div>
                     `
                 });
-
-                console.log(`[GYANKOSH DELIVERY] Email successfully sent to ${order.email}`);
-
-                // For WhatsApp delivery (To be implemented later)
-                if (order.phone) {
-                    const whatsappMsg = encodeURIComponent(
-                        `✅ *Payment Confirmed!*\n\n📚 *${order.product?.title}*\n💰 Amount: ₹${order.amount}\n\n📥 *Download your product:*\n${downloadLink}\n\nThank you for your purchase!\n— CoachPro Gyankosh`
-                    )
-                    // Log the WhatsApp message for manual/automated delivery
-                    console.log(`[GYANKOSH DELIVERY] WhatsApp to ${order.phone}: ${whatsappMsg}`)
-                }
-            } catch (deliveryError) {
-                console.error('Product delivery notification failed:', deliveryError)
-                // Payment is still successful, just delivery notification failed
-            }
+            } catch (err) { console.error('Email error:', err) }
         }
 
-        return NextResponse.json({
-            success: true,
-            message: 'Payment verified successfully.',
-            downloadLink: downloadLink || null
-        })
+        return NextResponse.json({ success: true, downloadLink: mainProduct?.fileUrl })
     } catch (error: any) {
-        console.error('Error verifying marketplace payment:', error)
-        return NextResponse.json({ error: error.message || 'Payment verification failed' }, { status: 500 })
+        console.error('Verify error:', error)
+        return NextResponse.json({ error: 'Verification failed' }, { status: 500 })
     }
 }

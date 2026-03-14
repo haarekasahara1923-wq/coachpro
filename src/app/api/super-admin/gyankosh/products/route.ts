@@ -13,7 +13,10 @@ export async function GET(req: NextRequest) {
         const user = getUser(req)
         if (!user || user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-        const products = await prisma.gyankoshProduct.findMany({ orderBy: { createdAt: 'desc' } })
+        const products = await prisma.gyankoshProduct.findMany({ 
+            include: { bonuses: true, orderBumps: true },
+            orderBy: { createdAt: 'desc' } 
+        })
 
         const orders = await prisma.gyankoshOrder.findMany({
             where: { status: 'SUCCESS' },
@@ -43,8 +46,28 @@ export async function POST(req: NextRequest) {
                 price: body.price,
                 discount: body.discount || 0,
                 imageUrl: body.imageUrl || '',
-                fileUrl: body.fileUrl || '', // Google Drive download link
-            }
+                fileUrl: body.fileUrl || '',
+                bonuses: {
+                    create: (body.bonuses || []).map((b: any) => ({
+                        title: b.title,
+                        description: b.description,
+                        imageUrl: b.imageUrl,
+                        fileUrl: b.fileUrl,
+                        originalPrice: b.originalPrice || 0
+                    }))
+                },
+                orderBumps: {
+                    create: (body.orderBumps || []).map((ob: any) => ({
+                        title: ob.title,
+                        description: ob.description,
+                        imageUrl: ob.imageUrl,
+                        fileUrl: ob.fileUrl,
+                        originalPrice: ob.originalPrice || 0,
+                        discountedPrice: ob.discountedPrice || 0
+                    }))
+                }
+            },
+            include: { bonuses: true, orderBumps: true }
         })
         return NextResponse.json(product)
     } catch (error) {
@@ -68,23 +91,54 @@ export async function PUT(req: NextRequest) {
         }
 
         if (body.action === 'edit') {
-            const product = await prisma.gyankoshProduct.update({
+            // Use transaction or separate calls to update bonuses/bumps
+            await prisma.$transaction([
+                prisma.gyankoshBonus.deleteMany({ where: { productId: body.id } }),
+                prisma.gyankoshOrderBump.deleteMany({ where: { productId: body.id } }),
+                prisma.gyankoshProduct.update({
+                    where: { id: body.id },
+                    data: {
+                        title: body.title,
+                        description: body.description,
+                        category: body.category,
+                        price: body.price,
+                        discount: body.discount || 0,
+                        imageUrl: body.imageUrl || '',
+                        fileUrl: body.fileUrl || '',
+                        bonuses: {
+                            create: (body.bonuses || []).map((b: any) => ({
+                                title: b.title,
+                                description: b.description,
+                                imageUrl: b.imageUrl,
+                                fileUrl: b.fileUrl,
+                                originalPrice: b.originalPrice || 0
+                            }))
+                        },
+                        orderBumps: {
+                            create: (body.orderBumps || []).map((ob: any) => ({
+                                title: ob.title,
+                                description: ob.description,
+                                imageUrl: ob.imageUrl,
+                                fileUrl: ob.fileUrl,
+                                originalPrice: ob.originalPrice || 0,
+                                discountedPrice: ob.discountedPrice || 0
+                            }))
+                        }
+                    }
+                })
+            ]);
+            
+            const updatedProduct = await prisma.gyankoshProduct.findUnique({
                 where: { id: body.id },
-                data: {
-                    title: body.title,
-                    description: body.description,
-                    category: body.category,
-                    price: body.price,
-                    discount: body.discount || 0,
-                    imageUrl: body.imageUrl || '',
-                    fileUrl: body.fileUrl || '',
-                }
+                include: { bonuses: true, orderBumps: true }
             })
-            return NextResponse.json(product)
+            return NextResponse.json(updatedProduct)
         }
 
         return NextResponse.json({ error: 'Invalid' }, { status: 400 })
     } catch (error) {
+        console.error(error)
         return NextResponse.json({ error: 'Failed' }, { status: 500 })
     }
 }
+

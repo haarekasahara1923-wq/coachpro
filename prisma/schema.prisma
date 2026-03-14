@@ -639,6 +639,8 @@ model GyankoshProduct {
   updatedAt   DateTime @updatedAt
 
   orders      GyankoshOrder[]
+  bonuses     GyankoshBonus[]
+  orderBumps  GyankoshOrderBump[]
 }
 
 enum CategoryType {
@@ -651,9 +653,35 @@ enum CategoryType {
   OTHER
 }
 
+model GyankoshBonus {
+  id          String   @id @default(cuid())
+  productId   String
+  title       String
+  description String?
+  imageUrl    String?
+  fileUrl     String?  // Google Drive link
+  originalPrice Float  @default(0) // Shown as strikethrough
+
+  product     GyankoshProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model GyankoshOrderBump {
+  id            String   @id @default(cuid())
+  productId     String
+  title         String
+  description   String?
+  imageUrl      String?
+  fileUrl       String?  // Google Drive link
+  originalPrice Float    @default(0)
+  discountedPrice Float  @default(0)
+
+  product       GyankoshProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
 model GyankoshOrder {
   id                String   @id @default(cuid())
   productId         String
+  orderBumpIds      String[] // IDs of selected order bumps
   studentName       String
   email             String
   phone             String
