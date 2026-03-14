@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Share2, ShoppingBag, ArrowRight, Gift, Zap } from 'lucide-react'
+import { Search, Share2 } from 'lucide-react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 
