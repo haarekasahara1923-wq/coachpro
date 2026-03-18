@@ -1,47 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { requireAuth, requireFeature } from '@/app/api/middleware'
-import { store, generateId } from '@/lib/store'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
     const { error, user } = requireAuth(req)
     if (error) return error
 
     // Ensure they have the analytics feature
-    const featureCheck = requireFeature(req, 'analytics')
+    const featureCheck = await requireFeature(req, 'analytics')
     if (featureCheck.error) return featureCheck.error
 
-    const { targetTenantId, month } = Object.fromEntries(new URL(req.url).searchParams.entries())
+    const { targetTenantId } = Object.fromEntries(new URL(req.url).searchParams.entries())
 
     // If super admin requests specific tenant data
+    let tenantId = user!.tenantId
     if (user!.role === 'SUPER_ADMIN' && targetTenantId) {
-        // ... (Super admin analytics logic, keeping it brief for this example)
-        return NextResponse.json({ success: true, data: {} })
+        tenantId = targetTenantId
     }
 
-    const tenantId = user!.tenantId
-    const tStudents = store.students.filter(s => s.tenantId === tenantId)
-    const tPayments = store.payments.filter(p => p.tenantId === tenantId)
-    const tLeads = store.leads.filter(l => l.tenantId === tenantId)
+    try {
+        const [
+            totalStudents,
+            activeStudents,
+            revenueData,
+            leadsCount
+        ] = await Promise.all([
+            prisma.student.count({ where: { tenantId } }),
+            prisma.student.count({ where: { tenantId, status: 'ACTIVE' } }),
+            prisma.payment.aggregate({ _sum: { amount: true }, where: { tenantId } }),
+            prisma.lead.count({ where: { tenantId } })
+        ])
 
-    // Calculate basic analytics (simplified for example)
-    const totalStudents = tStudents.length
-    const activeStudents = tStudents.filter(s => s.status === 'ACTIVE').length
-    const totalRevenue = tPayments.reduce((sum, p) => sum + p.amount, 0)
+        const totalRevenue = revenueData._sum.amount || 0
 
-    // ... Calculate other metrics ...
-
-    return NextResponse.json({
-        success: true,
-        data: {
-            overview: {
-                totalStudents,
-                activeStudents,
-                totalRevenue,
-                // ... other metrics ...
-            },
-            revenueTrend: [],
-            leadFunnel: [],
-            recentPayments: []
-        }
-    })
+        return NextResponse.json({
+            success: true,
+            data: {
+                overview: {
+                    totalStudents,
+                    activeStudents,
+                    totalRevenue,
+                    totalLeads: leadsCount
+                },
+                revenueTrend: [],
+                leadFunnel: [],
+                recentPayments: []
+            }
+        })
+    } catch (err) {
+        console.error('Analytics fetch error:', err)
+        return NextResponse.json({ success: false, error: 'Failed to fetch analytics' }, { status: 500 })
+    }
 }

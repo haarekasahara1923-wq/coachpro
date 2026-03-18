@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     if (error) return error
 
     // Feature gate check: User needs Pro/Elite plan for AI tools
-    const featureCheck = requireFeature(req, 'aiTools')
+    const featureCheck = await requireFeature(req, 'aiTools')
     if (featureCheck.error) return featureCheck.error
 
     try {

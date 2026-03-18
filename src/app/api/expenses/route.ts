@@ -1,29 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { requireAuth } from '@/app/api/middleware'
-import { store, generateId } from '@/lib/store'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
     const { error, user } = requireAuth(req)
     if (error) return error
-    const expenses = store.expenses.filter(e => e.tenantId === user!.tenantId)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    return NextResponse.json({ success: true, data: expenses })
+
+    try {
+        const expenses = await prisma.expense.findMany({
+            where: { tenantId: user!.tenantId },
+            orderBy: { date: 'desc' }
+        })
+        return NextResponse.json({ success: true, data: expenses })
+    } catch (err) {
+        console.error('Fetch expenses error:', err)
+        return NextResponse.json({ error: 'Failed to fetch expenses' }, { status: 500 })
+    }
 }
 
 export async function POST(req: NextRequest) {
     const { error, user } = requireAuth(req)
     if (error) return error
-    const body = await req.json()
-    const expense = {
-        id: generateId(),
-        tenantId: user!.tenantId,
-        category: body.category,
-        amount: parseFloat(body.amount),
-        date: body.date,
-        description: body.description || '',
-        paidTo: body.paidTo || '',
-        createdAt: new Date(),
+
+    try {
+        const body = await req.json()
+        const { category, amount, date, description, paidTo } = body
+
+        if (!category || !amount || !date) {
+            return NextResponse.json({ error: 'Required fields missing' }, { status: 400 })
+        }
+
+        const expense = await prisma.expense.create({
+            data: {
+                tenantId: user!.tenantId,
+                category,
+                amount: parseFloat(amount),
+                date: new Date(date),
+                description: description || '',
+                paidTo: paidTo || '',
+            }
+        })
+        return NextResponse.json({ success: true, data: expense }, { status: 201 })
+    } catch (err) {
+        console.error('Create expense error:', err)
+        return NextResponse.json({ error: 'Failed to create expense' }, { status: 500 })
     }
-    store.expenses.push(expense)
-    return NextResponse.json({ success: true, data: expense }, { status: 201 })
 }

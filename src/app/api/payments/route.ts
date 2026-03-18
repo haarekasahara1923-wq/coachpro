@@ -1,38 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { requireAuth } from '@/app/api/middleware'
-import { store, generateId } from '@/lib/store'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
     const { error, user } = requireAuth(req)
     if (error) return error
-    const payments = store.payments.filter(p => p.tenantId === user!.tenantId)
-    const students = store.students.filter(s => s.tenantId === user!.tenantId)
-    const enriched = payments.map(p => ({
-        ...p,
-        studentName: students.find(s => s.id === p.studentId)?.fullName || 'Unknown',
-    })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    return NextResponse.json({ success: true, data: enriched })
+
+    try {
+        const payments = await prisma.payment.findMany({
+            where: { tenantId: user!.tenantId },
+            include: { student: { select: { fullName: true } } },
+            orderBy: { createdAt: 'desc' }
+        })
+
+        const data = payments.map(p => ({
+            ...p,
+            studentName: p.student.fullName,
+        }))
+
+        return NextResponse.json({ success: true, data })
+    } catch (err) {
+        console.error('Fetch payments error:', err)
+        return NextResponse.json({ error: 'Failed to fetch payments' }, { status: 500 })
+    }
 }
 
 export async function POST(req: NextRequest) {
     const { error, user } = requireAuth(req)
     if (error) return error
-    const body = await req.json()
-    const payment = {
-        id: generateId(),
-        tenantId: user!.tenantId,
-        studentId: body.studentId,
-        feeId: body.feeId || undefined,
-        amount: parseFloat(body.amount),
-        mode: body.mode || 'CASH',
-        reference: body.reference || '',
-        receivedBy: body.receivedBy || '',
-        notes: body.notes || '',
-        createdAt: new Date(),
+
+    try {
+        const body = await req.json()
+        const { studentId, feeId, amount, mode, reference, receivedBy, notes } = body
+
+        if (!studentId || !amount) {
+            return NextResponse.json({ error: 'Student ID and amount are required' }, { status: 400 })
+        }
+
+        // Use a transaction to ensure both payment is created and student's paidFee is updated
+        const result = await prisma.$transaction(async (tx) => {
+            const payment = await tx.payment.create({
+                data: {
+                    tenantId: user!.tenantId,
+                    studentId,
+                    feeId: feeId || null,
+                    amount: parseFloat(amount),
+                    mode: mode as any || 'CASH',
+                    reference: reference || '',
+                    receivedBy: receivedBy || '',
+                    notes: notes || '',
+                }
+            })
+
+            await tx.student.update({
+                where: { id: studentId },
+                data: {
+                    paidFee: { increment: parseFloat(amount) }
+                }
+            })
+
+            return payment
+        })
+
+        return NextResponse.json({ success: true, data: result }, { status: 201 })
+    } catch (err) {
+        console.error('Create payment error:', err)
+        return NextResponse.json({ error: 'Failed to create payment' }, { status: 500 })
     }
-    store.payments.push(payment)
-    // update student paid fee
-    const student = store.students.find(s => s.id === body.studentId)
-    if (student) student.paidFee += payment.amount
-    return NextResponse.json({ success: true, data: payment }, { status: 201 })
 }

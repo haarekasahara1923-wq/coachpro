@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAccessToken } from '@/lib/auth'
-import { store } from '@/lib/store'
+import { prisma } from '@/lib/prisma'
 import { getPlanConfig, hasFeature, isWithinLimit, getUpgradePlanForFeature, type PlanFeatures, type PlanLimits } from '@/lib/planLimits'
 
 export function getAuthUser(req: NextRequest) {
@@ -29,18 +29,23 @@ export function requireRole(req: NextRequest, roles: string[]) {
     return { error: null, user }
 }
 
-// Get the current tenant's subscription plan
-export function getTenantPlan(tenantId: string): string {
-    const sub = store.subscriptions.find(s => s.tenantId === tenantId)
-    return sub?.plan || 'BASIC'
+// Get the current tenant's subscription plan from database
+export async function getTenantPlan(tenantId: string): Promise<string> {
+    try {
+        const sub = await prisma.subscription.findUnique({ where: { tenantId } })
+        return sub?.plan || 'BASIC'
+    } catch (err) {
+        console.error('getTenantPlan error:', err)
+        return 'BASIC'
+    }
 }
 
 // Check if a feature is available for the tenant's plan
-export function requireFeature(req: NextRequest, feature: keyof PlanFeatures) {
+export async function requireFeature(req: NextRequest, feature: keyof PlanFeatures) {
     const { error, user } = requireAuth(req)
     if (error) return { error, user: null }
 
-    const plan = getTenantPlan(user!.tenantId)
+    const plan = await getTenantPlan(user!.tenantId)
     if (!hasFeature(plan, feature)) {
         const upgradeTo = getUpgradePlanForFeature(feature)
         return {
@@ -57,8 +62,8 @@ export function requireFeature(req: NextRequest, feature: keyof PlanFeatures) {
 }
 
 // Check if adding a new entity is within the plan limit
-export function checkPlanLimit(tenantId: string, limitKey: keyof PlanLimits, currentCount: number) {
-    const plan = getTenantPlan(tenantId)
+export async function checkPlanLimit(tenantId: string, limitKey: keyof PlanLimits, currentCount: number) {
+    const plan = await getTenantPlan(tenantId)
     const config = getPlanConfig(plan)
     const max = config.limits[limitKey]
 

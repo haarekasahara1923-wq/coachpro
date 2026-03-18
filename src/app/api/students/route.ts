@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 
         // Total count for plan limit
         const totalCount = await prisma.student.count({ where: { tenantId: user!.tenantId } })
-        const limitCheck = checkPlanLimit(user!.tenantId, 'maxStudents', totalCount)
+        const limitCheck = await checkPlanLimit(user!.tenantId, 'maxStudents', totalCount)
 
         return NextResponse.json({
             success: true,
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
 
     try {
         const currentCount = await prisma.student.count({ where: { tenantId: user!.tenantId } })
-        const limitCheck = checkPlanLimit(user!.tenantId, 'maxStudents', currentCount)
+        const limitCheck = await checkPlanLimit(user!.tenantId, 'maxStudents', currentCount)
 
         if (!limitCheck.allowed) {
             return NextResponse.json({
