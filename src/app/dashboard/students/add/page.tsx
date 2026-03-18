@@ -13,7 +13,7 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
 export default function AddStudentPage() {
     const { token } = useAuth()
     const router = useRouter()
-    const [courses, setCourses] = useState<{ id: string; name: string; fees: number }[]>([])
+    const [courses, setCourses] = useState<{ id: string; name: string; fees: number; installmentCount: number }[]>([])
     const [batches, setBatches] = useState<{ id: string; name: string; courseId: string }[]>([])
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
@@ -143,8 +143,13 @@ export default function AddStudentPage() {
                                 disabled={metadataLoading}
                             >
                                 <option value="">{metadataLoading ? '⌛ Loading courses...' : 'Select Course'}</option>
-                                {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                {courses.map(c => <option key={c.id} value={c.id}>{c.name} ({c.installmentCount} Installments)</option>)}
                             </select>
+                            {form.courseId && courses.find(c => c.id === form.courseId) && (
+                                <div style={{ fontSize: '11px', color: 'var(--primary)', marginTop: '4px', fontWeight: 'bold' }}>
+                                    Fees will be split into {courses.find(c => c.id === form.courseId)?.installmentCount} installments automatically.
+                                </div>
+                            )}
                         </Field>
                         <Field label="Batch *">
                             <select className="input" value={form.batchId} onChange={e => setForm({ ...form, batchId: e.target.value })} required disabled={metadataLoading}>

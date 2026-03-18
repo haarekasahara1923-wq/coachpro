@@ -215,6 +215,7 @@ model Course {
   duration    String?
   fees        Float    @default(0)
   subjects    String[]
+  installmentCount Int    @default(1)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

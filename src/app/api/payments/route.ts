@@ -60,6 +60,21 @@ export async function POST(req: NextRequest) {
                 }
             })
 
+            // Update Installment Fee status if provided
+            if (feeId) {
+                const feeRecord = await tx.fee.findUnique({ where: { id: feeId } });
+                if (feeRecord) {
+                    const newStatus = parseFloat(amount) >= feeRecord.amount ? 'PAID' : 'PARTIAL';
+                    await tx.fee.update({
+                        where: { id: feeId },
+                        data: {
+                            status: newStatus,
+                            paidDate: new Date(),
+                        }
+                    });
+                }
+            }
+
             return payment
         })
 

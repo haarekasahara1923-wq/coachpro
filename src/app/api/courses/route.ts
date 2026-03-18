@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
                 duration: body.duration || '',
                 fees: parseFloat(body.fees) || 0,
                 subjects: body.subjects || [],
+                installmentCount: parseInt(body.installmentCount) || 1,
                 isActive: true,
             }
         })

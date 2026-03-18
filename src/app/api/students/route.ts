@@ -85,6 +85,14 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Required fields missing' }, { status: 400 })
         }
 
+        const course = await prisma.course.findUnique({
+            where: { id: courseId, tenantId: user!.tenantId }
+        })
+
+        if (!course) {
+            return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+        }
+
         const student = await prisma.student.create({
             data: {
                 tenantId: user!.tenantId,
@@ -102,12 +110,34 @@ export async function POST(req: NextRequest) {
                 dob: dob ? new Date(dob) : null,
                 admissionDate: admissionDate ? new Date(admissionDate) : new Date(),
                 feePlan: feePlan || '',
-                totalFee: parseFloat(totalFee) || 0,
+                totalFee: parseFloat(totalFee) || course.fees || 0,
                 paidFee: 0,
                 status: 'ACTIVE',
                 notes: notes || '',
             }
         })
+
+        // Create Fee installments automatically
+        const installmentCount = course.installmentCount || 1
+        const studentTotalFee = parseFloat(totalFee) || course.fees || 0
+        const installmentAmount = Math.round((studentTotalFee / installmentCount) * 100) / 100
+        const admDate = admissionDate ? new Date(admissionDate) : new Date()
+
+        for (let i = 0; i < installmentCount; i++) {
+            const dueDate = new Date(admDate)
+            dueDate.setMonth(dueDate.getMonth() + i)
+            
+            await prisma.fee.create({
+                data: {
+                    tenantId: user!.tenantId,
+                    studentId: student.id,
+                    amount: installmentAmount,
+                    dueDate,
+                    status: 'PENDING',
+                    notes: `Installment ${i + 1}/${installmentCount}`
+                }
+            })
+        }
 
         return NextResponse.json({ success: true, data: student }, { status: 201 })
     } catch (err) {

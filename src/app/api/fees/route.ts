@@ -8,8 +8,16 @@ export async function GET(req: NextRequest) {
     if (error) return error
 
     try {
+        const { searchParams } = new URL(req.url);
+        const studentId = searchParams.get('studentId');
+
+        const whereClause: any = { tenantId: user!.tenantId };
+        if (studentId) {
+            whereClause.studentId = studentId;
+        }
+
         const fees = await prisma.fee.findMany({
-            where: { tenantId: user!.tenantId },
+            where: whereClause,
             include: { student: { select: { fullName: true, phone: true } } },
             orderBy: { dueDate: 'asc' }
         })

@@ -4,13 +4,13 @@ import { useAuth } from '@/contexts/AuthContext'
 
 export default function CoursesPage() {
     const { token } = useAuth()
-    const [courses, setCourses] = useState<{ id: string; name: string; description: string; duration: string; fees: number; subjects: string[]; isActive: boolean }[]>([])
+    const [courses, setCourses] = useState<{ id: string; name: string; description: string; duration: string; fees: number; subjects: string[]; installmentCount: number; isActive: boolean }[]>([])
     const [batches, setBatches] = useState<{ id: string; name: string; courseId: string; courseName: string; startTime: string; endTime: string; capacity: number; studentCount: number }[]>([])
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState('courses')
     const [showAddCourse, setShowAddCourse] = useState(false)
     const [showAddBatch, setShowAddBatch] = useState(false)
-    const [courseForm, setCourseForm] = useState({ name: '', description: '', duration: '', fees: '', subjects: '' })
+    const [courseForm, setCourseForm] = useState({ name: '', description: '', duration: '', fees: '', subjects: '', installmentCount: '1' })
     const [batchForm, setBatchForm] = useState({ name: '', courseId: '', startTime: '', endTime: '', capacity: '30' })
     const [saving, setSaving] = useState(false)
     const [toast, setToast] = useState('')
@@ -38,7 +38,13 @@ export default function CoursesPage() {
         })
         const data = await res.json()
         setSaving(false)
-        if (data.success) { setToast('Course added!'); setShowAddCourse(false); fetchData(); setTimeout(() => setToast(''), 3000) }
+        if (data.success) { 
+            setToast('Course added!')
+            setShowAddCourse(false)
+            setCourseForm({ name: '', description: '', duration: '', fees: '', subjects: '', installmentCount: '1' })
+            fetchData()
+            setTimeout(() => setToast(''), 3000) 
+        }
     }
 
     const handleAddBatch = async (e: React.FormEvent) => {
@@ -75,7 +81,7 @@ export default function CoursesPage() {
             </div>
 
             {activeTab === 'courses' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
                     {loading ? <div style={{ padding: '40px' }}><div className="spinner" /></div> :
                         courses.map(c => (
                             <div key={c.id} className="card">
@@ -90,15 +96,16 @@ export default function CoursesPage() {
                                         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Fees</div>
                                     </div>
                                     <div style={{ padding: '10px', background: 'var(--surface-2)', borderRadius: '8px', textAlign: 'center' }}>
-                                        <div style={{ fontWeight: '800', color: '#6366f1', fontSize: '18px' }}>{c.duration || 'N/A'}</div>
-                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Duration</div>
+                                        <div style={{ fontWeight: '800', color: '#6366f1', fontSize: '18px' }}>{c.installmentCount}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Installments</div>
                                     </div>
                                 </div>
                                 <div>
-                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: '700', textTransform: 'uppercase' }}>Subjects</div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: '700', textTransform: 'uppercase' }}>Subjects & Details</div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                        <span style={{ padding: '3px 10px', background: 'rgba(110,231,183,0.1)', color: '#10b981', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>{c.duration}</span>
                                         {c.subjects.map(s => (
-                                            <span key={s} style={{ padding: '3px 10px', background: 'rgba(99,102,241,0.15)', color: 'var(--primary-light)', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>{s}</span>
+                                            <span key={s} style={{ padding: '3px 10px', background: 'rgba(99,102,241,0.15)', color: 'var(--primary-light)', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>{s}</span>
                                         ))}
                                     </div>
                                 </div>
@@ -152,7 +159,15 @@ export default function CoursesPage() {
                                     <div><label className="label">Duration</label><input className="input" placeholder="2 Years" value={courseForm.duration} onChange={e => setCourseForm({ ...courseForm, duration: e.target.value })} /></div>
                                     <div><label className="label">Fees (₹)</label><input className="input" type="number" placeholder="45000" value={courseForm.fees} onChange={e => setCourseForm({ ...courseForm, fees: e.target.value })} /></div>
                                 </div>
-                                <div><label className="label">Subjects (comma separated)</label><input className="input" placeholder="Physics, Chemistry, Maths" value={courseForm.subjects} onChange={e => setCourseForm({ ...courseForm, subjects: e.target.value })} /></div>
+                                <div className="grid-cols-2">
+                                    <div>
+                                        <label className="label">Installments (Months)</label>
+                                        <select className="input" value={courseForm.installmentCount} onChange={e => setCourseForm({ ...courseForm, installmentCount: e.target.value })}>
+                                            {[1, 2, 3, 4, 5, 6].map(i => <option key={i} value={i}>{i} Installment{i > 1 ? 's' : ''}</option>)}
+                                        </select>
+                                    </div>
+                                    <div><label className="label">Subjects (comma separated)</label><input className="input" placeholder="Physics, Chemistry, Maths" value={courseForm.subjects} onChange={e => setCourseForm({ ...courseForm, subjects: e.target.value })} /></div>
+                                </div>
                             </div>
                             <div className="modal-footer">
                                 <button type="button" onClick={() => setShowAddCourse(false)} className="btn btn-secondary">Cancel</button>
