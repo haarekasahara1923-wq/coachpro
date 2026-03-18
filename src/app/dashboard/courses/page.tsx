@@ -10,8 +10,8 @@ export default function CoursesPage() {
     const [activeTab, setActiveTab] = useState('courses')
     const [showAddCourse, setShowAddCourse] = useState(false)
     const [showAddBatch, setShowAddBatch] = useState(false)
-    const [courseForm, setCourseForm] = useState({ name: '', description: '', duration: '', fees: '', subjects: '', installmentCount: '1' })
-    const [batchForm, setBatchForm] = useState({ name: '', courseId: '', startTime: '', endTime: '', capacity: '30' })
+    const [courseForm, setCourseForm] = useState({ id: '', name: '', description: '', duration: '', fees: '', subjects: '', installmentCount: '1' })
+    const [batchForm, setBatchForm] = useState({ id: '', name: '', courseId: '', startTime: '', endTime: '', capacity: '30' })
     const [saving, setSaving] = useState(false)
     const [toast, setToast] = useState('')
 
@@ -31,33 +31,67 @@ export default function CoursesPage() {
     const handleAddCourse = async (e: React.FormEvent) => {
         e.preventDefault()
         setSaving(true)
+        const isEdit = !!courseForm.id
         const res = await fetch('/api/courses', {
-            method: 'POST',
+            method: isEdit ? 'PATCH' : 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({ ...courseForm, subjects: courseForm.subjects.split(',').map(s => s.trim()) }),
         })
         const data = await res.json()
         setSaving(false)
         if (data.success) { 
-            setToast('Course added!')
+            setToast(`Course ${isEdit ? 'updated' : 'added'}!`)
             setShowAddCourse(false)
-            setCourseForm({ name: '', description: '', duration: '', fees: '', subjects: '', installmentCount: '1' })
+            setCourseForm({ id: '', name: '', description: '', duration: '', fees: '', subjects: '', installmentCount: '1' })
             fetchData()
             setTimeout(() => setToast(''), 3000) 
-        }
+        } else { alert(data.error) }
     }
 
     const handleAddBatch = async (e: React.FormEvent) => {
         e.preventDefault()
         setSaving(true)
+        const isEdit = !!batchForm.id
         const res = await fetch('/api/batches', {
-            method: 'POST',
+            method: isEdit ? 'PATCH' : 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify(batchForm),
         })
         const data = await res.json()
         setSaving(false)
-        if (data.success) { setToast('Batch added!'); setShowAddBatch(false); fetchData(); setTimeout(() => setToast(''), 3000) }
+        if (data.success) {
+            setToast(`Batch ${isEdit ? 'updated' : 'added'}!`)
+            setShowAddBatch(false)
+            setBatchForm({ id: '', name: '', courseId: '', startTime: '', endTime: '', capacity: '30' })
+            fetchData()
+            setTimeout(() => setToast(''), 3000)
+        } else { alert(data.error) }
+    }
+
+    const handleDelete = async (type: 'course' | 'batch', id: string) => {
+        if (!confirm(`Are you sure you want to delete this ${type}?`)) return
+        const res = await fetch(`/api/${type === 'course' ? 'courses' : 'batches'}?id=${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+        })
+        const data = await res.json()
+        if (data.success) fetchData()
+        else alert(data.error)
+    }
+
+    const openEditCourse = (c: any) => {
+        setCourseForm({
+            id: c.id, name: c.name, description: c.description, duration: c.duration,
+            fees: String(c.fees), subjects: c.subjects.join(', '), installmentCount: String(c.installmentCount)
+        })
+        setShowAddCourse(true)
+    }
+
+    const openEditBatch = (b: any) => {
+        setBatchForm({
+            id: b.id, name: b.name, courseId: b.courseId, startTime: b.startTime, endTime: b.endTime, capacity: String(b.capacity)
+        })
+        setShowAddBatch(true)
     }
 
     return (
@@ -87,7 +121,11 @@ export default function CoursesPage() {
                             <div key={c.id} className="card">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                                     <h3 style={{ fontWeight: '700', fontSize: '16px' }}>{c.name}</h3>
-                                    <span className={`badge ${c.isActive ? 'badge-success' : 'badge-gray'}`}>{c.isActive ? 'Active' : 'Inactive'}</span>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button onClick={() => openEditCourse(c)} className="btn btn-sm" style={{ padding: '4px', background: 'transparent', color: '#6366f1' }}>✏️</button>
+                                        <button onClick={() => handleDelete('course', c.id)} className="btn btn-sm" style={{ padding: '4px', background: 'transparent', color: '#ef4444' }}>🗑️</button>
+                                        <span className={`badge ${c.isActive ? 'badge-success' : 'badge-gray'}`}>{c.isActive ? 'Active' : 'Inactive'}</span>
+                                    </div>
                                 </div>
                                 <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>{c.description}</p>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
@@ -119,7 +157,13 @@ export default function CoursesPage() {
                     {loading ? <div style={{ padding: '40px' }}><div className="spinner" /></div> :
                         batches.map(b => (
                             <div key={b.id} className="card">
-                                <h3 style={{ fontWeight: '700', fontSize: '15px', marginBottom: '6px' }}>{b.name}</h3>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <h3 style={{ fontWeight: '700', fontSize: '15px', marginBottom: '6px' }}>{b.name}</h3>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button onClick={() => openEditBatch(b)} className="btn btn-sm" style={{ padding: '4px', background: 'transparent', color: '#6366f1' }}>✏️</button>
+                                        <button onClick={() => handleDelete('batch', b.id)} className="btn btn-sm" style={{ padding: '4px', background: 'transparent', color: '#ef4444' }}>🗑️</button>
+                                    </div>
+                                </div>
                                 <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '16px' }}>{b.courseName}</p>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
                                     <div style={{ padding: '10px', background: 'var(--surface-2)', borderRadius: '8px', textAlign: 'center' }}>

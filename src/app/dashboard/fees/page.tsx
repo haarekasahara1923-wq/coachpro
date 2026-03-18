@@ -208,7 +208,32 @@ export default function FeesPage() {
                             {feesLoading ? (
                                 <div style={{ padding: '40px', textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
                             ) : studentFees.length === 0 ? (
-                                <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>No installments found for this student.</p>
+                                <div style={{ padding: '40px', textAlign: 'center' }}>
+                                    <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>No installments found! This usually happens for students added before installment tracking was enabled.</p>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        onClick={async () => {
+                                            setFeesLoading(true)
+                                            try {
+                                                const res = await fetch('/api/fees/generate', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                                    body: JSON.stringify({ studentId: selectedStudentForFees.id })
+                                                })
+                                                const data = await res.json()
+                                                if (data.success) {
+                                                    setToast('Installments generated successfully!')
+                                                    openInstallments(selectedStudentForFees)
+                                                } else {
+                                                    alert(data.error || 'Failed to generate')
+                                                    setFeesLoading(false)
+                                                }
+                                            } catch(err) { alert('Error'); setFeesLoading(false) }
+                                        }}
+                                    >
+                                        ⚙️ Auto-Generate Installments
+                                    </button>
+                                </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>

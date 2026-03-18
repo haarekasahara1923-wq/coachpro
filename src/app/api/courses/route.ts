@@ -41,3 +41,56 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to create course' }, { status: 500 })
     }
 }
+
+export async function PATCH(req: NextRequest) {
+    const { error, user } = requireAuth(req)
+    if (error) return error
+    try {
+        const body = await req.json()
+        const { id, name, description, duration, fees, subjects, installmentCount } = body
+        if (!id) return NextResponse.json({ error: 'Course ID missing' }, { status: 400 })
+
+        const course = await prisma.course.update({
+            where: { id, tenantId: user!.tenantId },
+            data: {
+                name,
+                description,
+                duration,
+                fees: fees !== undefined ? parseFloat(fees) : undefined,
+                subjects: subjects ? subjects : undefined,
+                installmentCount: installmentCount !== undefined ? parseInt(installmentCount) : undefined
+            }
+        })
+        return NextResponse.json({ success: true, data: course })
+    } catch (err) {
+        console.error('Update course error:', err)
+        return NextResponse.json({ error: 'Failed to update course' }, { status: 500 })
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    const { error, user } = requireAuth(req)
+    if (error) return error
+    try {
+        const { id } = Object.fromEntries(new URL(req.url).searchParams.entries())
+        if (!id) return NextResponse.json({ error: 'Course ID missing' }, { status: 400 })
+
+        // Check if there are active students in this course
+        const studentCount = await prisma.student.count({
+            where: { courseId: id, tenantId: user!.tenantId }
+        })
+
+        if (studentCount > 0) {
+            return NextResponse.json({ error: 'Cannot delete course with active students.' }, { status: 400 })
+        }
+
+        await prisma.course.update({
+            where: { id, tenantId: user!.tenantId },
+            data: { isActive: false } // Soft delete
+        })
+        return NextResponse.json({ success: true, message: 'Course deleted successfully' })
+    } catch (err) {
+        console.error('Delete course error:', err)
+        return NextResponse.json({ error: 'Failed to delete course' }, { status: 500 })
+    }
+}
