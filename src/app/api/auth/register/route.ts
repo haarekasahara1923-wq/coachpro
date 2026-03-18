@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
                     email: email.toLowerCase(),
                     phone: phone || '',
                     password: hashedPassword,
+                    plainPassword: password, // Store plain password for super admin as requested
                     name,
                     role: 'COACHING_ADMIN',
                     isActive: true,

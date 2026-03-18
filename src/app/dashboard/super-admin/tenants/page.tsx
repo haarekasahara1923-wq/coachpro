@@ -78,6 +78,7 @@ export default function AllTenantsPage() {
                                     <th>Students</th>
                                     <th>Affiliate Earnings</th>
                                     <th>Balance</th>
+                                    <th>Password</th>
                                     <th>Registered</th>
                                     <th>Status</th>
                                     <th>Actions</th>
@@ -107,6 +108,11 @@ export default function AllTenantsPage() {
                                             <td style={{ fontWeight: '600' }}>{t.studentCount}</td>
                                             <td style={{ fontWeight: '700', color: '#10b981' }}>₹{t.totalEarnings || 0}</td>
                                             <td style={{ fontWeight: '600' }}>₹{t.availableBalance || 0}</td>
+                                            <td>
+                                                <code style={{ background: 'rgba(99,102,241,0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px', color: '#818cf8', display: 'inline-block' }}>{t.adminPassword || '—'}</code>
+                                                <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginLeft: '4px', fontSize: '11px' }} 
+                                                    onClick={() => { navigator.clipboard.writeText(t.adminPassword); alert('Password copied!') }}>📋</button>
+                                            </td>
                                             <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(t.createdAt).toLocaleDateString()}</td>
                                             <td>
                                                 <span className={`badge ${t.isActive ? 'badge-success' : 'badge-danger'}`}>

@@ -19,6 +19,10 @@ export async function GET(req: NextRequest) {
         const tenants = await prisma.tenant.findMany({
             include: {
                 subscriptions: true,
+                users: {
+                    where: { role: 'COACHING_ADMIN' },
+                    select: { email: true, plainPassword: true }
+                },
                 _count: { select: { students: true, users: true } }
             },
             orderBy: { createdAt: 'desc' }
@@ -56,6 +60,7 @@ export async function GET(req: NextRequest) {
                 upiId: t.upiId,
                 bankAccountNo: t.bankAccountNo,
                 ifscCode: t.ifscCode,
+                adminPassword: t.users[0]?.plainPassword || '—',
                 createdAt: t.createdAt,
             }
         })

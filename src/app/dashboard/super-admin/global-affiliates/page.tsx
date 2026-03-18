@@ -108,6 +108,7 @@ export default function SuperAdminAffiliates() {
                         <thead>
                             <tr>
                                 <th>Affiliate Link Info</th>
+                                <th>Password</th>
                                 <th>Referrals</th>
                                 <th>Pending Sub. Commission</th>
                                 <th>Pending Mkt. Commission</th>
@@ -124,6 +125,11 @@ export default function SuperAdminAffiliates() {
                                             <span className="badge" style={{ background: 'var(--surface-2)', marginTop: '4px', fontSize: '10px' }}>
                                                 Code: {a.code}
                                             </span>
+                                        </td>
+                                        <td>
+                                            <code style={{ background: 'rgba(99,102,241,0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', color: '#818cf8', display: 'inline-block' }}>{a.password || '—'}</code>
+                                            <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginLeft: '4px', fontSize: '10px' }} 
+                                                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(a.password); alert('Password copied!') }}>📋</button>
                                         </td>
                                         <td>{a.totalReferred} tenants <span style={{ fontSize: '10px', marginLeft: '4px' }}>▼</span></td>
                                         <td>₹{a.pendingSubscriptionCommission.toLocaleString()}</td>

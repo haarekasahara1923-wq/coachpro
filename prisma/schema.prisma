@@ -7,6 +7,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 
@@ -71,6 +72,9 @@ model Affiliate {
   email                 String   @unique
   phone                 String?  
   password              String
+  plainPassword         String?  // For super admin visibility
+  resetToken            String?  @unique
+  resetTokenExpiry      DateTime?
   affiliateCode         String   @unique
   bankAccountNumber     String?
   ifscCode              String?
@@ -152,21 +156,24 @@ model AffiliatePayout {
 }
 
 model User {
-  id          String    @id @default(cuid())
-  tenantId    String
-  email       String
-  phone       String?
-  password    String
-  name        String
-  role        UserRole  @default(STAFF)
-  avatar      String?
-  isActive    Boolean   @default(true)
-  lastLogin   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  tenantId         String
+  email            String
+  phone            String?
+  password         String
+  plainPassword    String?   // For super admin visibility
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
+  name             String
+  role             UserRole  @default(STAFF)
+  avatar           String?
+  isActive         Boolean   @default(true)
+  lastLogin        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  auditLogs   AuditLog[]
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  auditLogs        AuditLog[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -180,6 +187,7 @@ enum UserRole {
   STUDENT
   PARENT
   AFFILIATE
+  RESELLER
 }
 
 model Branch {
@@ -583,7 +591,7 @@ enum SubscriptionStatus {
   SUSPENDED
   CANCELLED
   GRACE_PERIOD
-}
+  }
 
 model AuditLog {
   id         String   @id @default(cuid())

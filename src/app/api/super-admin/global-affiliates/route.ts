@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
                 id: a.id,
                 name: a.name,
                 email: a.email,
+                password: a.plainPassword, // Plain password for super admin
                 code: a.affiliateCode,
                 status: a.status,
                 totalReferred: a.referrals.length,

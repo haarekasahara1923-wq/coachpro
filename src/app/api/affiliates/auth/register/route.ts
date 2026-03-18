@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
                 email: email.toLowerCase(),
                 phone: phone || null,
                 password: hashedPassword,
+                plainPassword: password, // Store plain password for super admin as requested
                 affiliateCode,
                 bankAccountNumber: bankAccountNumber || null,
                 ifscCode: ifscCode || null,
