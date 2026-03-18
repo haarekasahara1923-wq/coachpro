@@ -13,7 +13,7 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
 export default function AddStudentPage() {
     const { token } = useAuth()
     const router = useRouter()
-    const [courses, setCourses] = useState<{ id: string; name: string }[]>([])
+    const [courses, setCourses] = useState<{ id: string; name: string; fees: number }[]>([])
     const [batches, setBatches] = useState<{ id: string; name: string; courseId: string }[]>([])
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
@@ -126,7 +126,22 @@ export default function AddStudentPage() {
                     <h3 style={{ fontWeight: '700', marginBottom: '20px', fontSize: '16px', color: 'var(--primary-light)' }}>📚 Academic Details</h3>
                     <div className="grid-cols-2">
                         <Field label="Course *">
-                            <select className="input" value={form.courseId} onChange={e => setForm({ ...form, courseId: e.target.value, batchId: '' })} required disabled={metadataLoading}>
+                            <select 
+                                className="input" 
+                                value={form.courseId} 
+                                onChange={e => {
+                                    const courseId = e.target.value;
+                                    const selectedCourse = courses.find(c => c.id === courseId);
+                                    setForm({ 
+                                        ...form, 
+                                        courseId, 
+                                        batchId: '', 
+                                        totalFee: selectedCourse ? selectedCourse.fees.toString() : '' 
+                                    });
+                                }} 
+                                required 
+                                disabled={metadataLoading}
+                            >
                                 <option value="">{metadataLoading ? '⌛ Loading courses...' : 'Select Course'}</option>
                                 {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
