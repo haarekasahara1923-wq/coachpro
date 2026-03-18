@@ -12,7 +12,7 @@ export interface JWTPayload {
 }
 
 export function signAccessToken(payload: JWTPayload): string {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: '15m' })
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' })
 }
 
 export function signRefreshToken(payload: JWTPayload): string {

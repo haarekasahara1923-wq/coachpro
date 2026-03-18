@@ -1,106 +1,117 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { requireAuth, checkPlanLimit } from '@/app/api/middleware'
-import { store, generateId } from '@/lib/store'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
     const { error, user } = requireAuth(req)
     if (error) return error
 
-    const students = store.students.filter(s => s.tenantId === user!.tenantId)
-    const courses = store.courses.filter(c => c.tenantId === user!.tenantId)
-    const batches = store.batches.filter(b => b.tenantId === user!.tenantId)
-
-    const enriched = students.map(s => ({
-        ...s,
-        courseName: courses.find(c => c.id === s.courseId)?.name || 'N/A',
-        batchName: batches.find(b => b.id === s.batchId)?.name || 'N/A',
-    }))
-
-    const { search, course, batch, status } = Object.fromEntries(
-        new URL(req.url).searchParams.entries()
-    )
-
-    let filtered = enriched
-    if (search) {
-        const q = search.toLowerCase()
-        filtered = filtered.filter(s =>
-            s.fullName.toLowerCase().includes(q) ||
-            s.phone.includes(q) ||
-            s.studentId?.toLowerCase().includes(q) ||
-            s.email?.toLowerCase().includes(q)
+    try {
+        const { search, course, batch, status } = Object.fromEntries(
+            new URL(req.url).searchParams.entries()
         )
+
+        const where: any = { tenantId: user!.tenantId }
+        if (course) where.courseId = course
+        if (batch) where.batchId = batch
+        if (status) where.status = status
+        if (search) {
+            where.OR = [
+                { fullName: { contains: search, mode: 'insensitive' } },
+                { phone: { contains: search } },
+                { studentId: { contains: search, mode: 'insensitive' } },
+            ]
+        }
+
+        const students = await prisma.student.findMany({
+            where,
+            include: {
+                course: { select: { name: true } },
+                batch: { select: { name: true } }
+            },
+            orderBy: { createdAt: 'desc' }
+        })
+
+        const data = students.map(s => ({
+            ...s,
+            courseName: s.course.name,
+            batchName: s.batch.name,
+        }))
+
+        // Total count for plan limit
+        const totalCount = await prisma.student.count({ where: { tenantId: user!.tenantId } })
+        const limitCheck = checkPlanLimit(user!.tenantId, 'maxStudents', totalCount)
+
+        return NextResponse.json({
+            success: true,
+            data,
+            total: data.length,
+            planInfo: {
+                limit: limitCheck.limit,
+                used: totalCount,
+                currentPlan: limitCheck.currentPlan,
+                canAdd: limitCheck.allowed,
+            },
+        })
+    } catch (err) {
+        console.error('Fetch students error:', err)
+        return NextResponse.json({ error: 'Failed to fetch students' }, { status: 500 })
     }
-    if (course) filtered = filtered.filter(s => s.courseId === course)
-    if (batch) filtered = filtered.filter(s => s.batchId === batch)
-    if (status) filtered = filtered.filter(s => s.status === status)
-
-    // Include plan limit info in response
-    const limitCheck = checkPlanLimit(user!.tenantId, 'maxStudents', students.length)
-
-    return NextResponse.json({
-        success: true,
-        data: filtered,
-        total: filtered.length,
-        planInfo: {
-            limit: limitCheck.limit,
-            used: students.length,
-            currentPlan: limitCheck.currentPlan,
-            canAdd: limitCheck.allowed,
-        },
-    })
 }
 
 export async function POST(req: NextRequest) {
     const { error, user } = requireAuth(req)
     if (error) return error
 
-    // Check plan limit before adding
-    const currentStudents = store.students.filter(s => s.tenantId === user!.tenantId)
-    const limitCheck = checkPlanLimit(user!.tenantId, 'maxStudents', currentStudents.length)
+    try {
+        const currentCount = await prisma.student.count({ where: { tenantId: user!.tenantId } })
+        const limitCheck = checkPlanLimit(user!.tenantId, 'maxStudents', currentCount)
 
-    if (!limitCheck.allowed) {
-        return NextResponse.json({
-            error: limitCheck.message,
-            code: 'PLAN_LIMIT_REACHED',
-            currentPlan: limitCheck.currentPlan,
-            limit: limitCheck.limit,
-            used: currentStudents.length,
-        }, { status: 403 })
+        if (!limitCheck.allowed) {
+            return NextResponse.json({
+                error: limitCheck.message,
+                code: 'PLAN_LIMIT_REACHED',
+                currentPlan: limitCheck.currentPlan,
+                limit: limitCheck.limit,
+                used: currentCount,
+            }, { status: 403 })
+        }
+
+        const body = await req.json()
+        const { fullName, phone, courseId, batchId, fatherName, motherName, parentPhone, email, address, gender, dob, admissionDate, feePlan, totalFee, notes } = body
+
+        if (!fullName || !phone || !courseId || !batchId) {
+            return NextResponse.json({ error: 'Required fields missing' }, { status: 400 })
+        }
+
+        const student = await prisma.student.create({
+            data: {
+                tenantId: user!.tenantId,
+                courseId,
+                batchId,
+                studentId: `STU${String(currentCount + 1).padStart(3, '0')}`,
+                fullName,
+                fatherName: fatherName || '',
+                motherName: motherName || '',
+                phone,
+                parentPhone: parentPhone || '',
+                email: email || '',
+                address: address || '',
+                gender: gender as any || 'MALE',
+                dob: dob ? new Date(dob) : null,
+                admissionDate: admissionDate ? new Date(admissionDate) : new Date(),
+                feePlan: feePlan || '',
+                totalFee: parseFloat(totalFee) || 0,
+                paidFee: 0,
+                status: 'ACTIVE',
+                notes: notes || '',
+            }
+        })
+
+        return NextResponse.json({ success: true, data: student }, { status: 201 })
+    } catch (err) {
+        console.error('Create student error:', err)
+        return NextResponse.json({ error: 'Failed to create student' }, { status: 500 })
     }
-
-    const body = await req.json()
-    const { fullName, phone, courseId, batchId, fatherName, motherName, parentPhone, email, address, gender, dob, admissionDate, feePlan, totalFee, notes } = body
-
-    if (!fullName || !phone || !courseId || !batchId) {
-        return NextResponse.json({ error: 'Required fields missing' }, { status: 400 })
-    }
-
-    const studentCount = currentStudents.length + 1
-    const newStudent = {
-        id: generateId(),
-        tenantId: user!.tenantId,
-        courseId,
-        batchId,
-        studentId: `STU${String(studentCount).padStart(3, '0')}`,
-        fullName,
-        fatherName: fatherName || '',
-        motherName: motherName || '',
-        phone,
-        parentPhone: parentPhone || '',
-        email: email || '',
-        address: address || '',
-        gender: gender || 'MALE',
-        dob: dob || '',
-        admissionDate: admissionDate || new Date().toISOString().split('T')[0],
-        feePlan: feePlan || '',
-        totalFee: parseFloat(totalFee) || 0,
-        paidFee: 0,
-        status: 'ACTIVE',
-        notes: notes || '',
-        createdAt: new Date(),
-    }
-
-    store.students.push(newStudent)
-
-    return NextResponse.json({ success: true, data: newStudent }, { status: 201 })
 }

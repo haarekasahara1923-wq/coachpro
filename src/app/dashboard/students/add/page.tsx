@@ -18,6 +18,7 @@ export default function AddStudentPage() {
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
     const [toast, setToast] = useState('')
+    const [metadataLoading, setMetadataLoading] = useState(true)
 
     const [form, setForm] = useState({
         fullName: '', fatherName: '', motherName: '', phone: '', parentPhone: '',
@@ -28,12 +29,18 @@ export default function AddStudentPage() {
 
     useEffect(() => {
         if (!token) return
+        setMetadataLoading(true)
         Promise.all([
             fetch('/api/courses', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
             fetch('/api/batches', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
         ]).then(([c, b]) => {
             if (c.success) setCourses(c.data)
             if (b.success) setBatches(b.data)
+            setMetadataLoading(false)
+        }).catch(err => {
+            console.error('Failed to fetch metadata:', err)
+            setToast('Failed to load courses and batches. Please refresh.')
+            setMetadataLoading(false)
         })
     }, [token])
 
@@ -119,14 +126,14 @@ export default function AddStudentPage() {
                     <h3 style={{ fontWeight: '700', marginBottom: '20px', fontSize: '16px', color: 'var(--primary-light)' }}>📚 Academic Details</h3>
                     <div className="grid-cols-2">
                         <Field label="Course *">
-                            <select className="input" value={form.courseId} onChange={e => setForm({ ...form, courseId: e.target.value, batchId: '' })} required>
-                                <option value="">Select Course</option>
+                            <select className="input" value={form.courseId} onChange={e => setForm({ ...form, courseId: e.target.value, batchId: '' })} required disabled={metadataLoading}>
+                                <option value="">{metadataLoading ? '⌛ Loading courses...' : 'Select Course'}</option>
                                 {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                         </Field>
                         <Field label="Batch *">
-                            <select className="input" value={form.batchId} onChange={e => setForm({ ...form, batchId: e.target.value })} required>
-                                <option value="">Select Batch</option>
+                            <select className="input" value={form.batchId} onChange={e => setForm({ ...form, batchId: e.target.value })} required disabled={metadataLoading}>
+                                <option value="">{metadataLoading ? '⌛ Loading batches...' : 'Select Batch'}</option>
                                 {filteredBatches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                             </select>
                         </Field>
