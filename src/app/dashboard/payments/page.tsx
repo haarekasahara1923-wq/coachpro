@@ -40,9 +40,12 @@ export default function PaymentsPage() {
     const [form, setForm] = useState({ studentId: '', amount: '', mode: 'CASH', reference: '', notes: '' })
     const [saving, setSaving] = useState(false)
     const [toast, setToast] = useState('')
+    const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
+    const [isEditing, setIsEditing] = useState(false)
 
     const fetchData = async () => {
         if (!token) return
+        setLoading(true)
         const [p, s] = await Promise.all([
             fetch('/api/payments', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
             fetch('/api/students', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
@@ -60,23 +63,67 @@ export default function PaymentsPage() {
         count: payments.filter(p => p.mode === mode).length,
     })).filter(m => m.count > 0)
 
-    const handleAdd = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setSaving(true)
-        const res = await fetch('/api/payments', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify(form),
-        })
-        const data = await res.json()
-        setSaving(false)
-        if (data.success) {
-            setToast('Payment recorded successfully!')
-            setShowAdd(false)
-            setForm({ studentId: '', amount: '', mode: 'CASH', reference: '', notes: '' })
-            fetchData()
-            setTimeout(() => setToast(''), 3000)
+        try {
+            const url = '/api/payments'
+            const method = isEditing ? 'PATCH' : 'POST'
+            const payload = isEditing ? { ...form, id: selectedPayment?.id } : form
+
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(payload),
+            })
+            const data = await res.json()
+            if (data.success) {
+                setToast(isEditing ? 'Payment updated successfully!' : 'Payment recorded successfully!')
+                setShowAdd(false)
+                setIsEditing(false)
+                setForm({ studentId: '', amount: '', mode: 'CASH', reference: '', notes: '' })
+                fetchData()
+                setTimeout(() => setToast(''), 3000)
+            } else {
+                alert(data.error || 'Failed to save payment')
+            }
+        } catch (err) {
+            alert('Error saving payment')
         }
+        setSaving(false)
+    }
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this payment record? The student\'s paid balance will be adjusted.')) return
+        try {
+            const res = await fetch(`/api/payments?id=${id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            const data = await res.json()
+            if (data.success) {
+                setToast('Payment deleted successfully!')
+                fetchData()
+                setTimeout(() => setToast(''), 3000)
+            } else {
+                alert(data.error || 'Failed to delete payment')
+            }
+        } catch (err) {
+            alert('Error deleting payment')
+        }
+    }
+
+    const startEdit = (p: Payment) => {
+        setIsEditing(true)
+        setSelectedPayment(p)
+        setForm({
+            studentId: p.studentId,
+            amount: p.amount.toString(),
+            mode: p.mode,
+            reference: p.reference,
+            notes: p.notes
+        })
+        setShowAdd(true)
     }
 
     return (
@@ -86,7 +133,7 @@ export default function PaymentsPage() {
                     <h1 className="page-title">💳 Fee Payments</h1>
                     <p className="page-subtitle">Total collected: {formatCurrency(totalCollection)}</p>
                 </div>
-                <button onClick={() => setShowAdd(true)} className="btn btn-primary">➕ Record Payment</button>
+                <button onClick={() => { setIsEditing(false); setForm({ studentId: '', amount: '', mode: 'CASH', reference: '', notes: '' }); setShowAdd(true); }} className="btn btn-primary">➕ Record Payment</button>
             </div>
 
             {toast && <div className="toast toast-success" style={{ position: 'relative', marginBottom: '16px', maxWidth: '100%' }}>✓ {toast}</div>}
@@ -104,7 +151,7 @@ export default function PaymentsPage() {
             {/* Table */}
             <div className="card" style={{ padding: 0 }}>
                 <div className="table-container">
-                    {loading ? (
+                    {loading && !payments.length ? (
                         <div style={{ padding: '40px', textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
                     ) : (
                         <table>
@@ -115,7 +162,7 @@ export default function PaymentsPage() {
                                     <th>Mode</th>
                                     <th>Reference</th>
                                     <th>Date</th>
-                                    <th>Notes</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -133,7 +180,12 @@ export default function PaymentsPage() {
                                         </td>
                                         <td style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{p.reference || '—'}</td>
                                         <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{formatDate(p.createdAt)}</td>
-                                        <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{p.notes || '—'}</td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                                <button onClick={() => startEdit(p)} className="btn btn-secondary btn-sm" title="Edit">✏️</button>
+                                                <button onClick={() => handleDelete(p.id)} className="btn btn-secondary btn-sm" style={{ color: '#ef4444' }} title="Delete">🗑️</button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -142,24 +194,25 @@ export default function PaymentsPage() {
                 </div>
             </div>
 
-            {/* Add Payment Modal */}
+            {/* Add/Edit Payment Modal */}
             {showAdd && (
-                <div className="modal-overlay">
-                    <div className="modal">
+                <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3 style={{ fontWeight: '700' }}>💳 Record Payment</h3>
+                            <h3 style={{ fontWeight: '700' }}>{isEditing ? '✏️ Edit Payment' : '💳 Record Payment'}</h3>
                             <button onClick={() => setShowAdd(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '20px', cursor: 'pointer' }}>✕</button>
                         </div>
-                        <form onSubmit={handleAdd}>
+                        <form onSubmit={handleSubmit}>
                             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div>
                                     <label className="label">Student *</label>
-                                    <select className="input" value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })} required>
+                                    <select className="input" value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })} required disabled={isEditing}>
                                         <option value="">Select Student</option>
                                         {students.map(s => (
                                             <option key={s.id} value={s.id}>{s.fullName} — Due: {formatCurrency(s.totalFee - s.paidFee)}</option>
                                         ))}
                                     </select>
+                                    {isEditing && <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Student cannot be changed for existing records.</p>}
                                 </div>
                                 <div className="grid-cols-2">
                                     <div>
@@ -190,7 +243,7 @@ export default function PaymentsPage() {
                             <div className="modal-footer">
                                 <button type="button" onClick={() => setShowAdd(false)} className="btn btn-secondary">Cancel</button>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? '⏳ Saving...' : '✅ Record Payment'}
+                                    {saving ? '⏳ Saving...' : isEditing ? '💾 Update Payment' : '✅ Record Payment'}
                                 </button>
                             </div>
                         </form>

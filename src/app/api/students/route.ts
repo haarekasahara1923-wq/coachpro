@@ -115,3 +115,62 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to create student' }, { status: 500 })
     }
 }
+
+export async function PATCH(req: NextRequest) {
+    const { error, user } = requireAuth(req)
+    if (error) return error
+
+    try {
+        const body = await req.json()
+        const { id, fullName, phone, courseId, batchId, status, fatherName, parentPhone, email, totalFee, admissionDate, notes } = body
+
+        if (!id) return NextResponse.json({ error: 'Student ID is required' }, { status: 400 })
+
+        const student = await prisma.student.update({
+            where: { id, tenantId: user!.tenantId },
+            data: {
+                fullName,
+                phone,
+                courseId,
+                batchId,
+                status: status as any,
+                fatherName,
+                parentPhone,
+                email,
+                totalFee: totalFee !== undefined ? parseFloat(totalFee) : undefined,
+                admissionDate: admissionDate ? new Date(admissionDate) : undefined,
+                notes,
+            }
+        })
+
+        return NextResponse.json({ success: true, data: student })
+    } catch (err) {
+        console.error('Update student error:', err)
+        return NextResponse.json({ error: 'Failed to update student' }, { status: 500 })
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    const { error, user } = requireAuth(req)
+    if (error) return error
+
+    try {
+        const { id } = Object.fromEntries(new URL(req.url).searchParams.entries())
+        if (!id) return NextResponse.json({ error: 'Student ID is required' }, { status: 400 })
+
+        // Check if student has payments or dependencies
+        const payments = await prisma.payment.count({ where: { studentId: id } })
+        if (payments > 0) {
+            return NextResponse.json({ error: 'Cannot delete student with payment history. Block them instead.' }, { status: 400 })
+        }
+
+        await prisma.student.delete({
+            where: { id, tenantId: user!.tenantId }
+        })
+
+        return NextResponse.json({ success: true, message: 'Student deleted' })
+    } catch (err) {
+        console.error('Delete student error:', err)
+        return NextResponse.json({ error: 'Failed to delete student' }, { status: 500 })
+    }
+}

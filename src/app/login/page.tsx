@@ -25,12 +25,6 @@ function LoginForm() {
         }
     }
 
-    const fillDemo = (role: string) => {
-        if (role === 'admin') { setEmail('admin@coaching.com'); setPassword('admin123') }
-        if (role === 'teacher') { setEmail('teacher@coaching.com'); setPassword('teacher123') }
-        if (role === 'super') { setEmail('superadmin@coachpro.in'); setPassword('super123') }
-    }
-
     return (
         <div style={{ minHeight: '100vh', background: 'var(--background)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             {/* Background */}
@@ -42,18 +36,6 @@ function LoginForm() {
                     <div style={{ width: '56px', height: '56px', background: 'linear-gradient(135deg, #6366f1, #ec4899)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', margin: '0 auto 16px' }}>🎓</div>
                     <h1 style={{ fontSize: '28px', fontWeight: '800', color: 'white' }}>Welcome back!</h1>
                     <p style={{ color: 'var(--text-secondary)', marginTop: '6px', fontSize: '14px' }}>Sign in to CoachPro Dashboard</p>
-                </div>
-
-                {/* Demo credentials */}
-                <div style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '14px', marginBottom: '20px' }}>
-                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🧪 Demo Accounts</p>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {[['Admin', 'admin'], ['Teacher', 'teacher'], ['Super Admin', 'super']].map(([label, role]) => (
-                            <button key={role} onClick={() => fillDemo(role)} style={{ padding: '4px 12px', background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px', color: 'var(--primary-light)', fontSize: '12px', cursor: 'pointer', fontWeight: '600' }}>
-                                {label}
-                            </button>
-                        ))}
-                    </div>
                 </div>
 
                 {/* Form */}

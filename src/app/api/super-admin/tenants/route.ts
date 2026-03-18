@@ -121,9 +121,51 @@ export async function PUT(req: NextRequest) {
             return NextResponse.json({ success: true, message: 'Subscription marked as paid' })
         }
 
+        if (action === 'edit') {
+            const { name, email, phone, address, upiId } = await req.json()
+            await prisma.tenant.update({
+                where: { id: tenantId },
+                data: { name, email, phone, address, upiId }
+            })
+            return NextResponse.json({ success: true, message: 'Tenant updated' })
+        }
+
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     } catch (error) {
         console.error('Super admin action error:', error)
         return NextResponse.json({ error: 'Failed' }, { status: 500 })
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    try {
+        const authHeader = req.headers.get('authorization')
+        if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        const user = verifyAccessToken(authHeader.split(' ')[1])
+        
+        if (!user || user.role !== 'SUPER_ADMIN') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
+        const { id } = Object.fromEntries(new URL(req.url).searchParams.entries())
+        if (!id) return NextResponse.json({ error: 'Tenant ID is required' }, { status: 400 })
+
+        // Use transaction to delete tenant and its related records
+        await prisma.$transaction([
+            prisma.subscription.deleteMany({ where: { tenantId: id } }),
+            prisma.user.deleteMany({ where: { tenantId: id } }),
+            prisma.student.deleteMany({ where: { tenantId: id } }),
+            prisma.payment.deleteMany({ where: { tenantId: id } }),
+            prisma.attendance.deleteMany({ where: { tenantId: id } }),
+            prisma.expense.deleteMany({ where: { tenantId: id } }),
+            prisma.lead.deleteMany({ where: { tenantId: id } }),
+            prisma.mockTest.deleteMany({ where: { tenantId: id } }),
+            prisma.tenant.delete({ where: { id } })
+        ])
+
+        return NextResponse.json({ success: true, message: 'Tenant and all associated data deleted' })
+    } catch (error) {
+        console.error('Super admin delete tenant error:', error)
+        return NextResponse.json({ error: 'Failed to delete tenant' }, { status: 500 })
     }
 }

@@ -69,3 +69,77 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to create payment' }, { status: 500 })
     }
 }
+
+export async function PATCH(req: NextRequest) {
+    const { error, user } = requireAuth(req)
+    if (error) return error
+
+    try {
+        const body = await req.json()
+        const { id, amount, mode, reference, notes } = body
+
+        if (!id) return NextResponse.json({ error: 'Payment ID is required' }, { status: 400 })
+
+        const result = await prisma.$transaction(async (tx) => {
+            const oldPayment = await tx.payment.findUnique({
+                where: { id, tenantId: user!.tenantId }
+            })
+            if (!oldPayment) throw new Error('Payment not found')
+
+            const amountDiff = (parseFloat(amount) || oldPayment.amount) - oldPayment.amount
+
+            const updatedPayment = await tx.payment.update({
+                where: { id },
+                data: {
+                    amount: amount !== undefined ? parseFloat(amount) : undefined,
+                    mode: mode as any,
+                    reference,
+                    notes,
+                }
+            })
+
+            if (amountDiff !== 0) {
+                await tx.student.update({
+                    where: { id: oldPayment.studentId },
+                    data: { paidFee: { increment: amountDiff } }
+                })
+            }
+
+            return updatedPayment
+        })
+
+        return NextResponse.json({ success: true, data: result })
+    } catch (err: any) {
+        console.error('Update payment error:', err)
+        return NextResponse.json({ error: err.message || 'Failed to update payment' }, { status: 500 })
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    const { error, user } = requireAuth(req)
+    if (error) return error
+
+    try {
+        const { id } = Object.fromEntries(new URL(req.url).searchParams.entries())
+        if (!id) return NextResponse.json({ error: 'Payment ID is required' }, { status: 400 })
+
+        await prisma.$transaction(async (tx) => {
+            const payment = await tx.payment.findUnique({
+                where: { id, tenantId: user!.tenantId }
+            })
+            if (!payment) throw new Error('Payment not found')
+
+            await tx.student.update({
+                where: { id: payment.studentId },
+                data: { paidFee: { decrement: payment.amount } }
+            })
+
+            await tx.payment.delete({ where: { id } })
+        })
+
+        return NextResponse.json({ success: true, message: 'Payment deleted' })
+    } catch (err: any) {
+        console.error('Delete payment error:', err)
+        return NextResponse.json({ error: err.message || 'Failed to delete payment' }, { status: 500 })
+    }
+}
