@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
 export async function POST(req: NextRequest) {
     try {
@@ -41,18 +41,13 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/reset-password?token=${resetToken}`
+        const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`
 
-        // Send Email
-        const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: Number(process.env.SMTP_PORT) || 587,
-            secure: Number(process.env.SMTP_PORT) === 465,
-            auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-        });
+        // Send Email via Resend
+        const resend = new Resend(process.env.RESEND_API_KEY)
 
-        await transporter.sendMail({
-            from: process.env.EMAIL_FROM || '"CoachPro Support" <noreply@coachpro.in>',
+        await resend.emails.send({
+            from: process.env.EMAIL_FROM || 'CoachPro <onboarding@resend.dev>',
             to: email,
             subject: 'Password Reset Request',
             html: `
@@ -61,7 +56,7 @@ export async function POST(req: NextRequest) {
                     <p>Hello,</p>
                     <p>We received a request to reset your password. Click the button below to set a new password. This link is valid for 1 hour.</p>
                     <div style="text-align: center; margin: 30px 0;">
-                        <a href="${resetUrl}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; borderRadius: 8px; fontWeight: bold;">Reset Password</a>
+                        <a href="${resetUrl}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Reset Password</a>
                     </div>
                     <p>If you didn't request this, you can safely ignore this email.</p>
                     <p style="font-size: 11px; color: #9ca3af; margin-top: 40px; text-align: center;">
@@ -70,7 +65,7 @@ export async function POST(req: NextRequest) {
                     </p>
                 </div>
             `
-        });
+        })
 
         return NextResponse.json({ success: true, message: 'Reset link sent to your email.' })
     } catch (error) {
