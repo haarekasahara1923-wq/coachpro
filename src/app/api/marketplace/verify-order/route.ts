@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
 export async function POST(req: Request) {
     try {
@@ -86,15 +86,9 @@ export async function POST(req: Request) {
 
         if (order.email) {
             try {
-                const transporter = nodemailer.createTransport({
-                    host: process.env.SMTP_HOST,
-                    port: Number(process.env.SMTP_PORT) || 587,
-                    secure: Number(process.env.SMTP_PORT) === 465,
-                    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-                });
-
-                await transporter.sendMail({
-                    from: process.env.EMAIL_FROM || '"CoachPro Gyankosh" <noreply@coachpro.in>',
+                const resend = new Resend(process.env.RESEND_API_KEY)
+                await resend.emails.send({
+                    from: process.env.EMAIL_FROM || 'CoachPro <onboarding@resend.dev>',
                     to: order.email,
                     subject: `Your Purchase Details - ${orderItems.length} Products`,
                     html: `
@@ -126,7 +120,7 @@ export async function POST(req: Request) {
                             <p style="font-size: 12px; color: #9ca3af; text-align: center;">Best regards,<br>CoachPro Gyankosh Team</p>
                         </div>
                     `
-                });
+                })
             } catch (err) { console.error('Email error:', err) }
         }
 
