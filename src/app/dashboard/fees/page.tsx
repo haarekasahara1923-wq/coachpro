@@ -235,39 +235,82 @@ export default function FeesPage() {
                                     </button>
                                 </div>
                             ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-                                        <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Payment Mode:</label>
-                                        <select className="input" style={{ width: 'auto', padding: '4px 8px', fontSize: '12px' }} value={paymentMode} onChange={e => setPaymentMode(e.target.value)}>
-                                            <option value="CASH">CASH</option>
-                                            <option value="UPI">UPI</option>
-                                            <option value="BANK_TRANSFER">BANK TRANSFER</option>
-                                            <option value="CARD">CARD</option>
-                                        </select>
-                                    </div>
-
-                                    {studentFees.map(fee => (
-                                        <div key={fee.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--surface-2)', borderRadius: '8px', borderLeft: `4px solid ${fee.status === 'PAID' ? '#10b981' : fee.status === 'PARTIAL' ? '#f59e0b' : '#ef4444'}` }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    <div style={{ padding: '12px', background: 'var(--surface-2)', borderRadius: '12px', marginBottom: '8px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                             <div>
-                                                <div style={{ fontWeight: '700', fontSize: '15px' }}>{formatCurrency(fee.amount)}</div>
-                                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{fee.notes || 'Installment'}</div>
-                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Due: {new Date(fee.dueDate).toLocaleDateString()}</div>
+                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800' }}>Total Fee</div>
+                                                <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary)' }}>{formatCurrency(selectedStudentForFees.totalFee)}</div>
                                             </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                                                <span className={`badge ${fee.status === 'PAID' ? 'badge-success' : fee.status === 'PARTIAL' ? 'badge-warning' : 'badge-danger'}`}>{fee.status}</span>
-                                                {fee.status !== 'PAID' && (
-                                                    <button 
-                                                        className="btn btn-primary btn-sm" 
-                                                        style={{ padding: '4px 12px', fontSize: '11px' }}
-                                                        onClick={() => handlePayInstallment(fee)}
-                                                        disabled={processingPayment === fee.id}
-                                                    >
-                                                        {processingPayment === fee.id ? '⏳ Processing...' : '💵 Mark Paid'}
-                                                    </button>
-                                                )}
+                                            <div style={{ textAlign: 'right' }}>
+                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800' }}>Remaining</div>
+                                                <div style={{ fontSize: '18px', fontWeight: '800', color: '#ef4444' }}>{formatCurrency(selectedStudentForFees.totalFee - selectedStudentForFees.paidFee)}</div>
                                             </div>
                                         </div>
-                                    ))}
+                                        <div className="progress-bar" style={{ marginTop: '12px', height: '6px' }}>
+                                            <div className="progress-fill" style={{ width: `${(selectedStudentForFees.paidFee / selectedStudentForFees.totalFee) * 100}%`, background: 'var(--primary)' }} />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                                        {[0, 1, 2, 3, 4, 5].map(idx => {
+                                            const fee = studentFees[idx]
+                                            return (
+                                                <div key={idx} style={{ padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px' }}>
+                                                    <div style={{ fontSize: '12px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-secondary)' }}>Slot {idx + 1}</div>
+                                                    <div style={{ position: 'relative' }}>
+                                                        <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: 'var(--text-muted)' }}>₹</span>
+                                                        <input 
+                                                            type="number" 
+                                                            className="input" 
+                                                            style={{ paddingLeft: '24px', fontWeight: '700' }} 
+                                                            placeholder="0.00"
+                                                            defaultValue={fee?.amount || 0}
+                                                            onBlur={async (e) => {
+                                                                const val = parseFloat(e.target.value) || 0
+                                                                if (fee && val === fee.amount) return
+                                                                
+                                                                if (!fee) {
+                                                                    alert('Please generate slots first!')
+                                                                    return
+                                                                }
+
+                                                                setFeesLoading(true)
+                                                                try {
+                                                                    const res = await fetch('/api/fees', {
+                                                                        method: 'PATCH',
+                                                                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                                                        body: JSON.stringify({ id: fee.id, amount: val })
+                                                                    })
+                                                                    const data = await res.json()
+                                                                    if (data.success) {
+                                                                        // Refresh data
+                                                                        const resStudents = await fetch('/api/students', { headers: { Authorization: `Bearer ${token}` } })
+                                                                        const dataStudents = await resStudents.json()
+                                                                        if (dataStudents.success) {
+                                                                            setStudents(dataStudents.data)
+                                                                            const updatedStu = dataStudents.data.find((s: any) => s.id === selectedStudentForFees.id)
+                                                                            if (updatedStu) setSelectedStudentForFees(updatedStu)
+                                                                        }
+                                                                        const resFees = await fetch(`/api/fees?studentId=${selectedStudentForFees.id}`, { headers: { Authorization: `Bearer ${token}` } })
+                                                                        const dataFees = await resFees.json()
+                                                                        if (dataFees.success) setStudentFees(dataFees.data)
+                                                                        
+                                                                        setToast(`Slot ${idx + 1} updated!`)
+                                                                        setTimeout(() => setToast(''), 3000)
+                                                                    }
+                                                                } catch(err) { alert('Update failed') }
+                                                                setFeesLoading(false)
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px' }}>
+                                        * Enter amount in any slot. Dashboard will update in real-time.
+                                    </div>
                                 </div>
                             )}
                         </div>

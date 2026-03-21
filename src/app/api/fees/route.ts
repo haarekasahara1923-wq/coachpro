@@ -64,3 +64,79 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to create fee' }, { status: 500 })
     }
 }
+
+export async function PATCH(req: NextRequest) {
+    const { error, user } = requireAuth(req)
+    if (error) return error
+
+    try {
+        const body = await req.json()
+        const { id, amount } = body
+
+        if (!id) return NextResponse.json({ error: 'Fee ID is required' }, { status: 400 })
+
+        const result = await prisma.$transaction(async (tx) => {
+            const oldFee = await tx.fee.findUnique({
+                where: { id, tenantId: user!.tenantId }
+            })
+            if (!oldFee) throw new Error('Fee record not found')
+
+            const newAmount = parseFloat(amount) || 0
+            const diff = newAmount - oldFee.amount
+
+            // Update Fee Record
+            const updatedFee = await tx.fee.update({
+                where: { id },
+                data: {
+                    amount: newAmount,
+                    status: newAmount > 0 ? 'PAID' : 'PENDING',
+                    paidDate: newAmount > 0 ? new Date() : null,
+                }
+            })
+
+            // Sync with Payment Record (to keep dashboard/history accurate)
+            const existingPayment = await tx.payment.findFirst({
+                where: { feeId: id, tenantId: user!.tenantId }
+            })
+
+            if (existingPayment) {
+                if (newAmount === 0) {
+                    await tx.payment.delete({ where: { id: existingPayment.id } })
+                } else {
+                    await tx.payment.update({
+                        where: { id: existingPayment.id },
+                        data: { amount: newAmount }
+                    })
+                }
+            } else if (newAmount > 0) {
+                await tx.payment.create({
+                    data: {
+                        tenantId: user!.tenantId,
+                        studentId: oldFee.studentId,
+                        feeId: id,
+                        amount: newAmount,
+                        mode: 'CASH',
+                        notes: `Slot Payment: ${oldFee.notes || 'Custom Slot'}`
+                    }
+                })
+            }
+
+            // Update Student Total Paid Fee
+            if (diff !== 0) {
+                await tx.student.update({
+                    where: { id: oldFee.studentId },
+                    data: {
+                        paidFee: { increment: diff }
+                    }
+                })
+            }
+
+            return updatedFee
+        })
+
+        return NextResponse.json({ success: true, data: result })
+    } catch (err: any) {
+        console.error('Update fee error:', err)
+        return NextResponse.json({ error: err.message || 'Failed to update fee' }, { status: 500 })
+    }
+}

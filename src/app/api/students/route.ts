@@ -117,13 +117,10 @@ export async function POST(req: NextRequest) {
             }
         })
 
-        // Create Fee installments automatically
-        const installmentCount = course.installmentCount || 1
-        const studentTotalFee = parseFloat(totalFee) || course.fees || 0
-        const installmentAmount = Math.round((studentTotalFee / installmentCount) * 100) / 100
+        // Create 6 Fee installments (blank slots as requested by user)
         const admDate = admissionDate ? new Date(admissionDate) : new Date()
 
-        for (let i = 0; i < installmentCount; i++) {
+        for (let i = 0; i < 6; i++) {
             const dueDate = new Date(admDate)
             dueDate.setMonth(dueDate.getMonth() + i)
             
@@ -131,10 +128,10 @@ export async function POST(req: NextRequest) {
                 data: {
                     tenantId: user!.tenantId,
                     studentId: student.id,
-                    amount: installmentAmount,
+                    amount: 0,
                     dueDate,
                     status: 'PENDING',
-                    notes: `Installment ${i + 1}/${installmentCount}`
+                    notes: `Installment ${i + 1}`
                 }
             })
         }
