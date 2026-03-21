@@ -45,9 +45,12 @@ export async function POST(req: NextRequest) {
 
         // Send Email via Resend
         const resend = new Resend(process.env.RESEND_API_KEY)
-
-        await resend.emails.send({
-            from: process.env.EMAIL_FROM || 'CoachPro <onboarding@resend.dev>',
+        const emailFrom = process.env.EMAIL_FROM || 'CoachPro <onboarding@resend.dev>'
+        
+        console.log('Attempting to send reset email from:', emailFrom)
+        
+        const { data, error: resendError } = await resend.emails.send({
+            from: emailFrom,
             to: email,
             subject: 'Password Reset Request',
             html: `
@@ -66,6 +69,13 @@ export async function POST(req: NextRequest) {
                 </div>
             `
         })
+
+        if (resendError) {
+            console.error('Resend API error:', resendError)
+            return NextResponse.json({ error: 'Failed to send email' }, { status: 500 })
+        }
+
+        console.log('Resend success data:', data)
 
         return NextResponse.json({ success: true, message: 'Reset link sent to your email.' })
     } catch (error) {
