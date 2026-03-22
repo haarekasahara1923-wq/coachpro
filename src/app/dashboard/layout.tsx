@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { hasFeature, NAV_FEATURE_MAP, PlanFeatures } from '@/lib/planLimits'
@@ -285,14 +285,22 @@ function DashboardHeader({ onMenuClick }: { onMenuClick: () => void }) {
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
-    const { user, isLoading } = useAuth()
+    const { user, isLoading, subscription } = useAuth()
     const router = useRouter()
+    const pathname = usePathname()
 
     useEffect(() => {
         if (!isLoading && !user) {
             router.push('/login')
+        } else if (!isLoading && user && user.role !== 'SUPER_ADMIN' && user.role !== 'AFFILIATE') {
+            if (subscription?.status === 'TRIAL' && subscription.trialEndsAt) {
+                const trialEnd = new Date(subscription.trialEndsAt)
+                if (new Date() > trialEnd && pathname !== '/dashboard/subscription') {
+                    router.push('/dashboard/subscription?autoCheckout=true')
+                }
+            }
         }
-    }, [user, isLoading, router])
+    }, [user, isLoading, router, subscription, pathname])
 
     if (isLoading) {
         return (

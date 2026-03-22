@@ -103,6 +103,8 @@ export default function SubscriptionPage() {
         }
     }
 
+    const isExpired = subscription?.status === 'TRIAL' && subscription?.trialEndsAt && new Date() > new Date(subscription.trialEndsAt)
+
     return (
         <div>
             <Script id="razorpay-checkout-js" src="https://checkout.razorpay.com/v1/checkout.js" />
@@ -113,8 +115,21 @@ export default function SubscriptionPage() {
                 </div>
             </div>
 
+            {isExpired && (
+                <div style={{ padding: '20px', background: '#fee2e2', border: '2px solid #ef4444', borderRadius: '12px', marginBottom: '24px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ fontSize: '32px' }}>⚠️</div>
+                    <div>
+                        <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>Free Trial Expired</h3>
+                        <p style={{ fontSize: '14px' }}>Your 7-day free trial has ended. Your services have been paused. Please upgrade to your registered plan below to reactivate your services.</p>
+                    </div>
+                </div>
+            )}
+
             {/* Current Plan */}
-            <div className="card" style={{ marginBottom: '24px', background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(236,72,153,0.1))', border: '1px solid rgba(99,102,241,0.3)' }}>
+            <div className="card" style={{ marginBottom: '24px', background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(236,72,153,0.1))', border: isExpired ? '2px solid #ef4444' : '1px solid rgba(99,102,241,0.3)', position: 'relative' }}>
+                {isExpired && (
+                    <div style={{ position: 'absolute', top: '-12px', right: '20px', background: '#ef4444', color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', animation: 'pulse 2s infinite' }}>Action Required</div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px' }}>Current Plan</div>
